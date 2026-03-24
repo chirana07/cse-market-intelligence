@@ -1,0 +1,122 @@
+[
+  {
+    "id": "case_001",
+    "category": "announcement",
+    "company_name": "Commercial Bank of Ceylon",
+    "ticker": "COMB.N0000",
+    "analysis_mode": "Company Deep Dive",
+    "question": "Did the company announce any dividend payments recently?",
+    "expected_signals": ["dividend declaration", "rate per share", "payment date"],
+    "must_include_topics": ["dividend"],
+    "must_not_hallucinate": true,
+    "notes": "Testing basic corporate action extraction."
+  },
+  {
+    "id": "case_002",
+    "category": "announcement",
+    "company_name": "John Keells Holdings",
+    "ticker": "JKH.N0000",
+    "analysis_mode": "General Search",
+    "question": "What major board meetings have taken place and what was discussed?",
+    "expected_signals": ["board meeting dates", "topics discussed or resolutions passed"],
+    "must_include_topics": ["board meeting"],
+    "must_not_hallucinate": true,
+    "notes": "Testing meeting summary extraction."
+  },
+  {
+    "id": "case_003",
+    "category": "report",
+    "company_name": "Dialog Axiata",
+    "ticker": "DIAL.N0000",
+    "analysis_mode": "Company Deep Dive",
+    "question": "What are the key revenue drivers highlighted in the latest annual report?",
+    "expected_signals": ["revenue growth", "segment performance", "mobile or broadband performance"],
+    "must_include_topics": ["revenue"],
+    "must_not_hallucinate": true,
+    "notes": "Testing qualitative report understanding."
+  },
+  {
+    "id": "case_004",
+    "category": "report",
+    "company_name": "Hatton National Bank",
+    "ticker": "HNB.N0000",
+    "analysis_mode": "Risk Analysis",
+    "question": "What are the primary risks or NPL concerns mentioned in the report?",
+    "expected_signals": ["non-performing loans", "credit risk", "macroeconomic impacts"],
+    "must_include_topics": ["risk", "non-performing", "NPL"],
+    "must_not_hallucinate": true,
+    "notes": "Testing risk factor extraction."
+  },
+  {
+    "id": "case_005",
+    "category": "stock",
+    "company_name": "Expolanka Holdings",
+    "ticker": "EXPO.N0000",
+    "analysis_mode": "Financial Analysis",
+    "question": "Describe the recent financial performance and any catalysts for growth.",
+    "expected_signals": ["freight rates", "logistics performance", "profitability"],
+    "must_include_topics": ["performance", "growth"],
+    "must_not_hallucinate": true,
+    "notes": "Testing broader stock synthesis."
+  },
+  {
+    "id": "case_006",
+    "category": "news_rag",
+    "company_name": "",
+    "ticker": "",
+    "analysis_mode": "Market Overview",
+    "question": "Summarize the overarching macroeconomic constraints affecting the CSE recently.",
+    "expected_signals": ["interest rates", "inflation", "IMF", "currency"],
+    "must_include_topics": ["macro", "economy"],
+    "must_not_hallucinate": true,
+    "notes": "Testing general domain broad RAG."
+  },
+  {
+    "id": "case_007",
+    "category": "announcement",
+    "company_name": "Lanka IOC",
+    "ticker": "LIOC.N0000",
+    "analysis_mode": "Company Deep Dive",
+    "question": "Have there been any recent price revisions or tariff updates communicated by LIOC?",
+    "expected_signals": ["fuel price", "revision", "margins"],
+    "must_include_topics": ["price"],
+    "must_not_hallucinate": true,
+    "notes": "Testing specific operational metric detection."
+  },
+  {
+    "id": "case_008",
+    "category": "portfolio",
+    "company_name": "Multiple",
+    "ticker": "",
+    "analysis_mode": "General Search",
+    "question": "Identify any cross-sector systemic risks that might impact banks and manufacturing stocks simultaneously.",
+    "expected_signals": ["interest rates", "taxes", "import restrictions"],
+    "must_include_topics": ["risk", "banking", "manufacturing"],
+    "must_not_hallucinate": true,
+    "notes": "Testing synthetic analytical reasoning across sectors."
+  },
+  {
+    "id": "case_009",
+    "category": "news_rag",
+    "company_name": "",
+    "ticker": "",
+    "analysis_mode": "General Search",
+    "question": "What regulatory changes have been announced by the Colombo Stock Exchange recently?",
+    "expected_signals": ["circulars", "rules", "listing requirements"],
+    "must_include_topics": ["regulation", "rules", "CSE"],
+    "must_not_hallucinate": true,
+    "notes": "Testing regulatory RAG extraction."
+  },
+  {
+    "id": "case_010",
+    "category": "report",
+    "company_name": "Sampath Bank",
+    "ticker": "SAMP.N0000",
+    "analysis_mode": "Company Deep Dive",
+    "question": "What is the bank's strategy regarding digitalization and branch expansion?",
+    "expected_signals": ["digital banking", "mobile app", "branch network"],
+    "must_include_topics": ["digital"],
+    "must_not_hallucinate": true,
+    "notes": "Testing strategic initiative synthesis."
+  }
+]
