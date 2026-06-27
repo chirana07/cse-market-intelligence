@@ -1,4 +1,6 @@
 streamlit
+fastapi
+uvicorn[standard]
 langchain
 langchain-community
 langchain-classic

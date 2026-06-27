@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      CHAT_MODEL: llama3.1
+      EMBED_MODEL: nomic-embed-text
+      VECTORSTORE_DIR: data/vectorstore
+      DATABASE_URL: sqlite:///data/app.db
+      LOG_DIR: data/logs
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama:

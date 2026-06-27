@@ -1,0 +1,14 @@
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+data/cache/
+data/debug/
+data/vectorstore/
+data/logs/
+data/*.db
+data/alerts_store.json

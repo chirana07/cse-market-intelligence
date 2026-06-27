@@ -58,6 +58,14 @@ The same run metadata, document index, and chunk index are also persisted to SQL
 URL ingestion includes SSRF-style safeguards, and analyst queries/retrieved context are screened for prompt-injection patterns before synthesis.
 Generated analyst answers are validated for required output sections and flagged if they contain direct buy/sell or guaranteed-return language.
 
+## 🚢 Production Readiness
+
+-   Streamlit app: `streamlit run app.py`
+-   API surface: `uvicorn src.api.main:app --reload --port 8000`
+-   Docker: `docker compose up --build`
+-   CI: GitHub Actions runs unit tests and source compilation on push/PR.
+-   Docs: see `docs/architecture.md`, `docs/evaluation.md`, `docs/demo_script.md`, and `docs/deployment.md`.
+
 ## 📂 Project Structure
 
 -   `src/`: Core logic, including price clients, RAG chains, and AI signal extractors.
