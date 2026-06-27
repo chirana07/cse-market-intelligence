@@ -1,23 +1,23 @@
-# 📊 CSE Market Intelligence 
+# CSE Market Intelligence
 
 An AI-powered equity research platform focused on the **Colombo Stock Exchange (CSE)**. This project leverages **Retrieval-Augmented Generation (RAG)** to analyze stock reports, company announcements, and portfolio risk.
 
-## ✨ Key Features
+## Key Features
 
--   **🔍 Stock Research**: Real-time market data integration with Yahoo Finance for full price history and performance metrics.
--   **💼 Portfolio Intelligence**: 
+-   **Stock Research**: Real-time market data integration with Yahoo Finance for full price history and performance metrics.
+-   **Portfolio Intelligence**:
     -   Automated portfolio risk & concentration monitoring.
     -   Smart CSV parsing (with or without headers).
     -   AI-generated portfolio summaries and reviews.
--   **📑 Report & Announcement Intelligence**:
+-   **Report & Announcement Intelligence**:
     -   Summarize and extract key financial facts from PDF reports.
     -   Track and analyze latest CSE disclosures using NLP.
     -   Structured event extraction (Materiality, Event Type, Positives/Risks).
--   **📈 Stock Screener**: Advanced filtering to identify market opportunities.
--   **🔔 Alerts & Monitoring**: Real-time tracking of market events and price movements.
--   **📝 AI Research Memos**: Auto-generate deep research memos combining market view and latest disclosures.
+-   **Stock Screener**: Advanced filtering to identify market opportunities.
+-   **Alerts & Monitoring**: Real-time tracking of market events and price movements.
+-   **AI Research Memos**: Auto-generate deep research memos combining market view and latest disclosures.
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 -   **Language**: Python 3.10+
 -   **Web Framework**: [Streamlit](https://streamlit.io/)
@@ -27,7 +27,7 @@ An AI-powered equity research platform focused on the **Colombo Stock Exchange (
 -   **PDF Processing**: `PyMuPDF` / `pdfplumber`
 -   **Data Analysis**: `pandas`, `plotly`
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 -   Install [Ollama](https://ollama.ai/) and pull the required model (e.g., `llama3`).
@@ -58,7 +58,7 @@ The same run metadata, document index, and chunk index are also persisted to SQL
 URL ingestion includes SSRF-style safeguards, and analyst queries/retrieved context are screened for prompt-injection patterns before synthesis.
 Generated analyst answers are validated for required output sections and flagged if they contain direct buy/sell or guaranteed-return language.
 
-## 🚢 Production Readiness
+## Production Readiness
 
 -   Streamlit app: `streamlit run app.py`
 -   API surface: `uvicorn src.api.main:app --reload --port 8000`
@@ -66,7 +66,7 @@ Generated analyst answers are validated for required output sections and flagged
 -   CI: GitHub Actions runs unit tests and source compilation on push/PR.
 -   Docs: see `docs/architecture.md`, `docs/evaluation.md`, `docs/demo_script.md`, and `docs/deployment.md`.
 
-## 📂 Project Structure
+## Project Structure
 
 -   `src/`: Core logic, including price clients, RAG chains, and AI signal extractors.
 -   `src/views/`: Individual Streamlit pages (Dashboard, Research, Portfolio, etc.).

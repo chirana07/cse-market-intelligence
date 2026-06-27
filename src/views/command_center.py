@@ -260,9 +260,9 @@ with main_left:
 
                     act_c1, act_c2, act_c3 = st.columns(3)
                     if detail_url:
-                        act_c1.link_button("Open ↗", detail_url, use_container_width=True)
+                        act_c1.link_button("Open", detail_url, use_container_width=True)
                     elif pdf_url:
-                        act_c1.link_button("PDF ↗", pdf_url, use_container_width=True)
+                        act_c1.link_button("PDF", pdf_url, use_container_width=True)
                     if act_c2.button("Stock Research", key=f"cc_sr_{card_idx}", use_container_width=True, disabled=not tk):
                         send_to_stock_research(tk, co)
                     if act_c3.button("Ask Copilot", key=f"cc_cp_{card_idx}", use_container_width=True, disabled=not tk):
@@ -337,18 +337,18 @@ with bot_left:
             use_container_width=True,
             hide_index=True,
         )
-        if st.button("Open Portfolio Intelligence →", use_container_width=True, key="cc_port_btn"):
+        if st.button("Open Portfolio Intelligence", use_container_width=True, key="cc_port_btn"):
             st.switch_page("src/views/portfolio_intelligence.py")
     else:
         empty_state("", "No portfolio loaded", "Upload your holdings CSV in Portfolio Intelligence to see your snapshot here.")
-        if st.button("Build Portfolio Snapshot →", use_container_width=True, key="cc_port_build"):
+        if st.button("Build Portfolio Snapshot", use_container_width=True, key="cc_port_build"):
             st.switch_page("src/views/portfolio_intelligence.py")
 
 with bot_right:
     section_header("Alert Rules")
     if alerts_df.empty:
         empty_state("", "No alerts configured", "Set up price and disclosure alerts in the Alerts & Monitoring page.")
-        if st.button("Configure Alerts →", use_container_width=True, key="cc_alerts_btn"):
+        if st.button("Configure Alerts", use_container_width=True, key="cc_alerts_btn"):
             st.switch_page("src/views/alerts_monitoring.py")
     else:
         preview_cols = [
@@ -360,8 +360,8 @@ with bot_right:
             use_container_width=True,
             hide_index=True,
         )
-        if st.button("Manage Alerts & Monitoring →", use_container_width=True, key="cc_alerts_manage"):
+        if st.button("Manage Alerts & Monitoring", use_container_width=True, key="cc_alerts_manage"):
             st.switch_page("src/views/alerts_monitoring.py")
 
-with st.expander("🔧 Debug Info"):
+with st.expander("Debug Info"):
     st.caption(f"Universe rows: {len(universe_df)} · Announcements: {len(ann_df)} · Alerts: {len(alerts_df)} · Triggered: {len(triggered_df)}")
