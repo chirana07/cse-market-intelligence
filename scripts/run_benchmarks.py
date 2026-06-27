@@ -6,10 +6,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.vectorstore import load_vectorstore
 from src.rag_chain import build_qa_chain
 from src.benchmark_runner import load_benchmark_cases, run_benchmark_suite
+from src.config import VECTORSTORE_DIR
 
 def main():
     print("Loading Vectorstore...")
-    vectorstore = load_vectorstore()
+    vectorstore = load_vectorstore(VECTORSTORE_DIR)
+    if vectorstore is None:
+        print(f"Error: no vectorstore found at {VECTORSTORE_DIR}. Ingest sources before running benchmarks.")
+        sys.exit(1)
     
     print("Building QA Chain...")
     chain = build_qa_chain(vectorstore)

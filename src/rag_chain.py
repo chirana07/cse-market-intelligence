@@ -3,6 +3,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_ollama import ChatOllama
 
 from src.config import CHAT_MODEL, OLLAMA_BASE_URL
+from src.settings import SETTINGS
 
 
 ANALYST_PROMPT = PromptTemplate(
@@ -51,8 +52,8 @@ def build_qa_chain(vectorstore, domain_filter=None, source_filter=None):
     )
 
     search_kwargs = {
-        "k": 6,
-        "fetch_k": 30,
+        "k": SETTINGS.rag_top_k,
+        "fetch_k": SETTINGS.rag_fetch_k,
     }
 
     metadata_filter = {}

@@ -23,6 +23,7 @@ pg = st.navigation(
         "Monitoring": [
             st.Page("src/views/alerts_monitoring.py",  title="Alerts & Monitoring",   icon=":material/notifications_active:"),
             st.Page("src/views/market_dashboard.py",   title="Market Dashboard",      icon=":material/monitoring:"),
+            st.Page("src/views/debug_observability.py", title="Agent Observability",   icon=":material/bug_report:"),
         ],
     }
 )

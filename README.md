@@ -39,12 +39,22 @@ Clone the repository and install dependencies:
 git clone https://github.com/chirana07/cse-market-intelligence.git
 cd cse-market-intelligence
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
 ### 3. Run the App
 ```bash
 streamlit run app.py
 ```
+
+### 4. Evaluation & Production Checks
+```bash
+python3 -m unittest discover tests
+python3 scripts/run_benchmarks.py
+```
+
+Agent runs are logged as JSONL under `data/logs/agent_runs.jsonl` for debugging, demo defense, and regression review.
+The same run metadata, document index, and chunk index are also persisted to SQLite using `DATABASE_URL`.
 
 ## 📂 Project Structure
 

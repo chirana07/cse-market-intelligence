@@ -5,6 +5,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_ollama import OllamaEmbeddings
 
 from src.config import EMBED_MODEL, OLLAMA_BASE_URL
+from src.db.repositories import upsert_document_chunks
 
 
 def get_embeddings():
@@ -159,21 +160,35 @@ def ingest_chunks(chunks, save_path: str):
         embeddings = get_embeddings()
         vectorstore = FAISS.from_documents(new_chunks, embeddings)
         vectorstore.save_local(save_path)
+        try:
+            db_stats = upsert_document_chunks(new_chunks)
+        except Exception:
+            db_stats = {"documents": 0, "chunks": 0}
 
         return vectorstore, {
             "mode": "created",
             "new_chunks": len(new_chunks),
             "skipped_duplicates": skipped_duplicates,
+            "db_documents": db_stats["documents"],
+            "db_chunks": db_stats["chunks"],
         }
 
     if new_chunks:
         vectorstore.add_documents(new_chunks)
         vectorstore.save_local(save_path)
+        try:
+            db_stats = upsert_document_chunks(new_chunks)
+        except Exception:
+            db_stats = {"documents": 0, "chunks": 0}
+    else:
+        db_stats = {"documents": 0, "chunks": 0}
 
     return vectorstore, {
         "mode": "appended" if new_chunks else "no_new_chunks",
         "new_chunks": len(new_chunks),
         "skipped_duplicates": skipped_duplicates,
+        "db_documents": db_stats["documents"],
+        "db_chunks": db_stats["chunks"],
     }
 
 
