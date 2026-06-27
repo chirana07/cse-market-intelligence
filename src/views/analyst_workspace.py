@@ -11,7 +11,8 @@ from src.vectorstore import (
     ingest_chunks,
     load_vectorstore,
 )
-from src.rag_chain import build_qa_chain
+from src.agents.graph import run_analyst_workflow
+from src.agents.state import AnalystRequest
 from src.research_memo import build_memo_filename, build_research_memo_markdown
 from src.persistence import (
     build_memo_cache_key,
@@ -299,26 +300,18 @@ if run_analysis:
     elif not research_query.strip():
         st.warning("Please enter a research question.")
     else:
-        enriched_question = f"""
-Company Focus: {company_name or "Not specified"}
-Ticker Focus: {ticker or selected_ticker}
-Analysis Mode: {analysis_mode}
-Detected Ticker Filter: {selected_ticker}
-Event Filter: {selected_event}
-Domain Filter: {selected_domain}
-Source Filter: {selected_source}
-
-Research Question:
-{research_query}
-""".strip()
-
         with st.spinner("Generating analyst output..."):
-            chain = build_qa_chain(
-                vectorstore,
-                domain_filter=selected_domain,
-                source_filter=selected_source,
+            request = AnalystRequest(
+                company_name=company_name,
+                ticker=ticker or selected_ticker,
+                analysis_mode=analysis_mode,
+                research_query=research_query,
+                selected_domain=selected_domain,
+                selected_source=selected_source,
+                selected_ticker=selected_ticker,
+                selected_event=selected_event,
             )
-            result = chain.invoke({"question": enriched_question})
+            result = run_analyst_workflow(vectorstore, request)
 
         memo_md = build_research_memo_markdown(
             company_name=company_name,
@@ -341,6 +334,7 @@ Research Question:
             analysis_mode=analysis_mode,
         )
         st.session_state.analysis_meta = {
+            "run_id": result.get("run_id", ""),
             "company_name": company_name,
             "ticker": ticker or selected_ticker,
             "analysis_mode": analysis_mode,
@@ -391,6 +385,7 @@ if st.session_state.analysis_result:
         st.toast("Memo saved to history!")
 
     export_col3.caption(
+        f"Run: `{meta.get('run_id', 'N/A')}` · "
         f"Mode: **{meta.get('analysis_mode', 'N/A')}** · "
         f"Domain: {meta.get('selected_domain', 'All')} · "
         f"Ticker: {meta.get('selected_ticker', 'All')}"
@@ -399,7 +394,8 @@ if st.session_state.analysis_result:
     source_docs = result.get("source_documents", [])
     if source_docs:
         formatted_docs = format_evidence(source_docs)
-        metrics = compute_retrieval_metrics(formatted_docs)
+        metrics = result.get("evidence_metrics") or compute_retrieval_metrics(formatted_docs)
+        critic = result.get("critic") or {}
 
         divider_label("Evidence Quality")
 
@@ -412,6 +408,12 @@ if st.session_state.analysis_result:
         if metrics["gaps_or_warnings"]:
             for w in metrics["gaps_or_warnings"]:
                 st.warning(w)
+
+        if critic:
+            st.caption(
+                f"Grounding critic: **{critic.get('status', 'unknown')}** · "
+                f"{critic.get('message', '')}"
+            )
 
         if metrics["confidence_label"] == "Low":
             st.info("Limited evidence diversity — treat this answer with caution.")
@@ -436,6 +438,16 @@ if st.session_state.analysis_result:
                     if doc["events"]:
                         st.caption(f"Events: {doc['events']}")
                     st.write(doc["snippet"])
+    else:
+        critic = result.get("critic") or {}
+        if critic:
+            divider_label("Evidence Quality")
+            st.warning(critic.get("message", "No retrieved evidence was available."))
+
+    trajectory = result.get("trajectory", [])
+    if trajectory:
+        with st.expander("Agent Trace"):
+            st.json(trajectory)
 else:
     st.markdown("<br>", unsafe_allow_html=True)
     st.info("Enter a research question above and click **Run Analysis** to generate AI analyst output.")

@@ -1,4 +1,7 @@
-VECTORSTORE_DIR = "data/vectorstore"
-OLLAMA_BASE_URL = "http://localhost:11434"
-CHAT_MODEL = "llama3.1"
-EMBED_MODEL = "nomic-embed-text"
+from src.settings import SETTINGS
+
+
+VECTORSTORE_DIR = SETTINGS.vectorstore_dir
+OLLAMA_BASE_URL = SETTINGS.ollama_base_url
+CHAT_MODEL = SETTINGS.chat_model
+EMBED_MODEL = SETTINGS.embed_model
