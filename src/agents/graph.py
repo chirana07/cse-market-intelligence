@@ -5,6 +5,7 @@ from typing import Any
 
 from src.agents.critic import apply_grounding_gate, evaluate_grounding
 from src.agents.state import AnalystRequest, AnalystRunResult
+from src.guardrails import assess_prompt_injection
 from src.observability import log_agent_run, new_run_id
 from src.rag_chain import build_qa_chain
 from src.tools.retrieval import evaluate_retrieved_evidence
@@ -37,6 +38,7 @@ def run_analyst_workflow(
     trajectory: list[dict[str, Any]] = []
     started = time.time()
 
+    query_guardrail = assess_prompt_injection(request.research_query)
     trajectory.append(
         {
             "node": "intake_router",
@@ -44,8 +46,72 @@ def run_analyst_workflow(
             "analysis_mode": request.analysis_mode,
             "has_company": bool(request.company_name),
             "has_ticker": bool(request.ticker or request.selected_ticker != "All"),
+            "query_guardrail": {
+                "risk_level": query_guardrail.risk_level,
+                "matched_count": len(query_guardrail.matched_patterns),
+                "blocked": query_guardrail.should_block,
+            },
         }
     )
+
+    if query_guardrail.should_block:
+        answer = (
+            "I cannot process this request because it appears to ask for hidden prompts, "
+            "secrets, or unsafe instruction override behavior. Please ask a market or "
+            "company research question grounded in CSE evidence."
+        )
+        evidence_metrics = {
+            "retrieved_chunk_count": 0,
+            "unique_source_count": 0,
+            "unique_domain_count": 0,
+            "evidence_score": 0,
+            "confidence_label": "Low",
+            "coverage_label": "Blocked",
+            "gaps_or_warnings": ["Request blocked by prompt-injection guardrail."],
+        }
+        critic = {
+            "status": "blocked",
+            "confidence": "Low",
+            "should_replace_answer": False,
+            "message": "Request blocked before retrieval by prompt-injection guardrail.",
+            "warnings": evidence_metrics["gaps_or_warnings"],
+        }
+        elapsed = round(time.time() - started, 3)
+        log_agent_run(
+            {
+                "run_id": run_id,
+                "event_type": "analyst_workflow",
+                "latency_sec": elapsed,
+                "request": {
+                    "company_name": request.company_name,
+                    "ticker": request.ticker,
+                    "analysis_mode": request.analysis_mode,
+                    "selected_domain": request.selected_domain,
+                    "selected_source": request.selected_source,
+                    "selected_ticker": request.selected_ticker,
+                    "selected_event": request.selected_event,
+                    "research_query_len": len(request.research_query or ""),
+                },
+                "evidence_metrics": evidence_metrics,
+                "critic": critic,
+                "sources": [],
+                "trajectory": trajectory,
+                "guardrails": {
+                    "query": {
+                        "risk_level": query_guardrail.risk_level,
+                        "matched_count": len(query_guardrail.matched_patterns),
+                    }
+                },
+            }
+        )
+        return AnalystRunResult(
+            run_id=run_id,
+            answer=answer,
+            source_documents=[],
+            evidence_metrics=evidence_metrics,
+            critic=critic,
+            trajectory=trajectory,
+        ).to_chain_result()
 
     enriched_question = request.enriched_question()
     trajectory.append(
@@ -99,11 +165,23 @@ def run_analyst_workflow(
     retrieval_output = evaluate_retrieved_evidence(source_documents, retrieval_input)
     formatted_docs = retrieval_output.formatted_docs
     evidence_metrics = retrieval_output.metrics
+    context_assessments = [
+        assess_prompt_injection(doc.get("snippet", ""), block_high_risk=False)
+        for doc in formatted_docs
+    ]
+    context_warning_count = sum(1 for item in context_assessments if item.risk_level != "low")
+    if context_warning_count:
+        evidence_metrics.setdefault("gaps_or_warnings", []).append(
+            f"{context_warning_count} retrieved chunk(s) contain instruction-like text and were treated as untrusted evidence."
+        )
     trajectory.append(
         {
             "node": "evidence_retrieval",
             "status": "completed",
             "metrics": evidence_metrics,
+            "context_guardrail": {
+                "warning_count": context_warning_count,
+            },
         }
     )
 
@@ -138,6 +216,13 @@ def run_analyst_workflow(
             "critic": critic,
             "sources": _source_log_summary(formatted_docs),
             "trajectory": trajectory,
+            "guardrails": {
+                "query": {
+                    "risk_level": query_guardrail.risk_level,
+                    "matched_count": len(query_guardrail.matched_patterns),
+                },
+                "retrieved_context_warning_count": context_warning_count,
+            },
         }
     )
 

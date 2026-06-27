@@ -1,20 +1,16 @@
-from urllib.parse import urlparse
 import re
 
 from langchain_community.document_loaders import UnstructuredURLLoader, WebBaseLoader
 
 from src.enrichment import enrich_document_metadata
+from src.guardrails import validate_ingest_url
 
 
 URL_REGEX = re.compile(r"https?://[^\s<>\"]+")
 
 
 def is_valid_url(url: str) -> bool:
-    try:
-        parsed = urlparse(url.strip())
-        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-    except Exception:
-        return False
+    return validate_ingest_url(url).allowed
 
 
 def _clean_extracted_url(url: str) -> str:
@@ -23,7 +19,7 @@ def _clean_extracted_url(url: str) -> str:
 
 def load_single_url(url: str):
     url = url.strip()
-    if not is_valid_url(url):
+    if not validate_ingest_url(url).allowed:
         return []
 
     try:
@@ -51,7 +47,7 @@ def load_single_url(url: str):
 
 def load_urls(urls: list[str]):
     cleaned_urls = list(dict.fromkeys([
-        u.strip() for u in urls if u.strip() and is_valid_url(u)
+        u.strip() for u in urls if u.strip() and validate_ingest_url(u).allowed
     ]))
 
     all_docs = []
@@ -84,7 +80,7 @@ def parse_uploaded_txt_file(uploaded_file):
     extracted_urls = []
     for match in URL_REGEX.findall(content):
         candidate = _clean_extracted_url(match)
-        if is_valid_url(candidate):
+        if validate_ingest_url(candidate).allowed:
             extracted_urls.append(candidate)
 
     valid_urls = list(dict.fromkeys(extracted_urls))
