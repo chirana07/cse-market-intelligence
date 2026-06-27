@@ -56,6 +56,7 @@ python3 scripts/run_benchmarks.py
 Agent runs are logged as JSONL under `data/logs/agent_runs.jsonl` for debugging, demo defense, and regression review.
 The same run metadata, document index, and chunk index are also persisted to SQLite using `DATABASE_URL`.
 URL ingestion includes SSRF-style safeguards, and analyst queries/retrieved context are screened for prompt-injection patterns before synthesis.
+Generated analyst answers are validated for required output sections and flagged if they contain direct buy/sell or guaranteed-return language.
 
 ## 📂 Project Structure
 

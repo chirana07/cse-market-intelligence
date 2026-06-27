@@ -118,6 +118,7 @@ def upsert_agent_run(event: dict[str, Any], db_path: str | Path | None = None) -
     request = event.get("request", {}) or {}
     evidence = event.get("evidence_metrics", {}) or {}
     critic = event.get("critic", {}) or {}
+    output_validation = event.get("output_validation", {}) or {}
     trajectory = event.get("trajectory", []) or []
     sources = event.get("sources", []) or []
 
@@ -127,10 +128,10 @@ def upsert_agent_run(event: dict[str, Any], db_path: str | Path | None = None) -
             INSERT INTO agent_runs (
                 run_id, event_type, logged_at, analysis_mode, ticker, company_name,
                 latency_sec, critic_status, confidence, evidence_score, source_count,
-                chunk_count, request_json, evidence_json, critic_json, trajectory_json,
+                chunk_count, request_json, evidence_json, critic_json, output_validation_json, trajectory_json,
                 sources_json, raw_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id) DO UPDATE SET
                 event_type=excluded.event_type,
                 logged_at=excluded.logged_at,
@@ -146,6 +147,7 @@ def upsert_agent_run(event: dict[str, Any], db_path: str | Path | None = None) -
                 request_json=excluded.request_json,
                 evidence_json=excluded.evidence_json,
                 critic_json=excluded.critic_json,
+                output_validation_json=excluded.output_validation_json,
                 trajectory_json=excluded.trajectory_json,
                 sources_json=excluded.sources_json,
                 raw_json=excluded.raw_json
@@ -166,6 +168,7 @@ def upsert_agent_run(event: dict[str, Any], db_path: str | Path | None = None) -
                 _json_dumps(request),
                 _json_dumps(evidence),
                 _json_dumps(critic),
+                _json_dumps(output_validation),
                 _json_dumps(trajectory),
                 _json_dumps(sources),
                 _json_dumps(event),
@@ -192,6 +195,7 @@ def get_recent_agent_runs(limit: int = 100, db_path: str | Path | None = None) -
         item["request"] = json.loads(item.pop("request_json", "{}") or "{}")
         item["evidence_metrics"] = json.loads(item.pop("evidence_json", "{}") or "{}")
         item["critic"] = json.loads(item.pop("critic_json", "{}") or "{}")
+        item["output_validation"] = json.loads(item.pop("output_validation_json", "{}") or "{}")
         item["trajectory"] = json.loads(item.pop("trajectory_json", "[]") or "[]")
         item["sources"] = json.loads(item.pop("sources_json", "[]") or "[]")
         results.append(item)

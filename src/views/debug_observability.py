@@ -45,6 +45,7 @@ summary_rows = []
 for run in runs:
     metrics = run.get("evidence_metrics", {}) or {}
     critic = run.get("critic", {}) or {}
+    output_validation = run.get("output_validation", {}) or {}
     request = run.get("request", {}) or {}
     summary_rows.append(
         {
@@ -55,6 +56,8 @@ for run in runs:
             "latency_sec": run.get("latency_sec", ""),
             "critic": critic.get("status", ""),
             "confidence": critic.get("confidence", ""),
+            "output": output_validation.get("status", ""),
+            "format_score": output_validation.get("structure_score", ""),
             "evidence_score": metrics.get("evidence_score", 0),
             "sources": metrics.get("unique_source_count", 0),
             "chunks": metrics.get("retrieved_chunk_count", 0),
@@ -82,6 +85,8 @@ with detail_col1:
     st.json(selected.get("request", {}))
     st.markdown("#### Evidence Metrics")
     st.json(selected.get("evidence_metrics", {}))
+    st.markdown("#### Output Validation")
+    st.json(selected.get("output_validation", {}))
 
 with detail_col2:
     st.markdown("#### Grounding Critic")

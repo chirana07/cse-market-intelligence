@@ -5,7 +5,7 @@ from typing import Any
 
 from src.agents.critic import apply_grounding_gate, evaluate_grounding
 from src.agents.state import AnalystRequest, AnalystRunResult
-from src.guardrails import assess_prompt_injection
+from src.guardrails import apply_output_safety_notice, assess_prompt_injection, validate_analyst_answer
 from src.observability import log_agent_run, new_run_id
 from src.rag_chain import build_qa_chain
 from src.tools.retrieval import evaluate_retrieved_evidence
@@ -76,6 +76,7 @@ def run_analyst_workflow(
             "message": "Request blocked before retrieval by prompt-injection guardrail.",
             "warnings": evidence_metrics["gaps_or_warnings"],
         }
+        output_validation = validate_analyst_answer(answer).to_dict()
         elapsed = round(time.time() - started, 3)
         log_agent_run(
             {
@@ -96,6 +97,7 @@ def run_analyst_workflow(
                 "critic": critic,
                 "sources": [],
                 "trajectory": trajectory,
+                "output_validation": output_validation,
                 "guardrails": {
                     "query": {
                         "risk_level": query_guardrail.risk_level,
@@ -110,6 +112,7 @@ def run_analyst_workflow(
             source_documents=[],
             evidence_metrics=evidence_metrics,
             critic=critic,
+            output_validation=output_validation,
             trajectory=trajectory,
         ).to_chain_result()
 
@@ -187,12 +190,24 @@ def run_analyst_workflow(
 
     critic = evaluate_grounding(answer, evidence_metrics)
     answer = apply_grounding_gate(answer, critic)
+    output_validation_result = validate_analyst_answer(answer)
+    answer = apply_output_safety_notice(answer, output_validation_result)
+    output_validation = output_validation_result.to_dict()
     trajectory.append(
         {
             "node": "grounding_critic",
             "status": critic.get("status", "unknown"),
             "confidence": critic.get("confidence"),
             "message": critic.get("message"),
+        }
+    )
+    trajectory.append(
+        {
+            "node": "output_validator",
+            "status": output_validation["status"],
+            "structure_score": output_validation["structure_score"],
+            "missing_sections": output_validation["missing_sections"],
+            "unsafe_advice_pattern_count": len(output_validation["unsafe_advice_patterns"]),
         }
     )
 
@@ -214,6 +229,7 @@ def run_analyst_workflow(
             },
             "evidence_metrics": evidence_metrics,
             "critic": critic,
+            "output_validation": output_validation,
             "sources": _source_log_summary(formatted_docs),
             "trajectory": trajectory,
             "guardrails": {
@@ -232,5 +248,6 @@ def run_analyst_workflow(
         source_documents=source_documents,
         evidence_metrics=evidence_metrics,
         critic=critic,
+        output_validation=output_validation,
         trajectory=trajectory,
     ).to_chain_result()
