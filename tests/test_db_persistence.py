@@ -60,6 +60,7 @@ class DbPersistenceTests(unittest.TestCase):
                         "retrieved_chunk_count": 5,
                     },
                     "critic": {"status": "approved", "confidence": "High"},
+                    "output_validation": {"status": "passed", "structure_score": 100},
                     "trajectory": [{"node": "test", "status": "completed"}],
                     "sources": [{"source_url": "https://example.com"}],
                 },
@@ -71,6 +72,7 @@ class DbPersistenceTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["run_id"], "run_1")
             self.assertEqual(rows[0]["critic"]["status"], "approved")
+            self.assertEqual(rows[0]["output_validation"]["status"], "passed")
             self.assertEqual(rows[0]["evidence_metrics"]["evidence_score"], 80)
             self.assertEqual(get_agent_run_counts(db_path=db_path)["runs"], 1)
 

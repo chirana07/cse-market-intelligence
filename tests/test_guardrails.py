@@ -41,6 +41,7 @@ class GuardrailTests(unittest.TestCase):
             )
 
         self.assertEqual(result["critic"]["status"], "blocked")
+        self.assertIn("output_validation", result)
         self.assertEqual(result["source_documents"], [])
         self.assertIn("cannot process", result["answer"])
 

@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     request_json TEXT NOT NULL DEFAULT '{}',
     evidence_json TEXT NOT NULL DEFAULT '{}',
     critic_json TEXT NOT NULL DEFAULT '{}',
+    output_validation_json TEXT NOT NULL DEFAULT '{}',
     trajectory_json TEXT NOT NULL DEFAULT '[]',
     sources_json TEXT NOT NULL DEFAULT '[]',
     raw_json TEXT NOT NULL DEFAULT '{}'
@@ -61,6 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_agent_runs_logged_at ON agent_runs(logged_at);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_ticker ON agent_runs(ticker);
 CREATE INDEX IF NOT EXISTS idx_agent_runs_critic ON agent_runs(critic_status);
 """
+
+MIGRATION_SQL = [
+    "ALTER TABLE agent_runs ADD COLUMN output_validation_json TEXT NOT NULL DEFAULT '{}'",
+]
 
 
 def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
@@ -74,4 +79,9 @@ def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
 def init_db(db_path: str | Path | None = None) -> None:
     with get_connection(db_path) as conn:
         conn.executescript(SCHEMA_SQL)
-
+        for statement in MIGRATION_SQL:
+            try:
+                conn.execute(statement)
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise

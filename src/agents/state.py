@@ -37,6 +37,7 @@ class AnalystRunResult:
     source_documents: list[Any] = field(default_factory=list)
     evidence_metrics: dict[str, Any] = field(default_factory=dict)
     critic: dict[str, Any] = field(default_factory=dict)
+    output_validation: dict[str, Any] = field(default_factory=dict)
     trajectory: list[dict[str, Any]] = field(default_factory=list)
 
     def to_chain_result(self) -> dict[str, Any]:
@@ -46,6 +47,6 @@ class AnalystRunResult:
             "source_documents": self.source_documents,
             "evidence_metrics": self.evidence_metrics,
             "critic": self.critic,
+            "output_validation": self.output_validation,
             "trajectory": self.trajectory,
         }
-
