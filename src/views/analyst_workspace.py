@@ -88,7 +88,8 @@ def doc_matches_filters(doc, domain_filter="All", ticker_filter="All", event_fil
 
 # ---------------------------
 # Sidebar: ingestion
-# ----------------------st.sidebar.header("📰 News Sources")
+# ---------------------------
+st.sidebar.header("Source Ingestion")
 
 manual_url_1 = st.sidebar.text_input("URL 1")
 manual_url_2 = st.sidebar.text_input("URL 2")
@@ -367,14 +368,14 @@ if st.session_state.analysis_result:
     st.markdown("<br>", unsafe_allow_html=True)
     export_col1, export_col2, export_col3 = st.columns([1, 1, 2])
     export_col1.download_button(
-        "💾 Download Memo (.md)",
+        "Download Memo",
         data=st.session_state.analysis_memo_md,
         file_name=st.session_state.analysis_memo_filename,
         mime="text/markdown",
         use_container_width=True,
     )
 
-    if export_col2.button("📌 Save to History", use_container_width=True):
+    if export_col2.button("Save to History", use_container_width=True):
         cache_key = build_memo_cache_key(
             meta.get("company_name", ""),
             meta.get("ticker", ""),
@@ -420,19 +421,19 @@ if st.session_state.analysis_result:
         elif metrics["confidence_label"] == "High":
             st.success("Strong evidence grounding — answer is well-supported.")
 
-        with st.expander("🧠 Grade Answer Support (AI Judge)"):
+        with st.expander("Grade Answer Support"):
             if st.checkbox("Run AI grading pass", value=False):
                 with st.spinner("Grading..."):
                     grade = grade_answer_support(meta.get("research_query", ""), answer_text, formatted_docs)
                 st.markdown(f"**Support Grade:** `{grade}`")
 
-        with st.expander("📎 Evidence Sources ({} chunks)".format(len(formatted_docs))):
+        with st.expander("Evidence Sources ({} chunks)".format(len(formatted_docs))):
             for i, doc in enumerate(formatted_docs, start=1):
                 with st.container(border=True):
                     c1, c2 = st.columns([3, 1])
                     c1.markdown(f"**{i}. {doc['title']}**")
                     c2.caption(doc['domain'])
-                    st.caption(f"🔗 {doc['source_url']}")
+                    st.caption(f"Source: {doc['source_url']}")
                     if doc["tickers"]:
                         st.caption(f"Tickers: {doc['tickers']}")
                     if doc["events"]:
@@ -464,7 +465,7 @@ if recent_memos:
         m_meta = m["meta"]
         m_title = m_meta.get("company_name") or m_meta.get("ticker") or "General"
         date_str = m_meta.get("created_at", "")[:10]
-        with st.expander(f"📝 {m_title} · {date_str}"):
+        with st.expander(f"{m_title} · {date_str}"):
             st.caption(f"**Query**: {m_meta.get('research_query')}")
             mode_badge = status_badge(m_meta.get('analysis_mode', 'N/A'), 'info')
             st.markdown(mode_badge, unsafe_allow_html=True)

@@ -10,6 +10,7 @@ class ProductionArtifactTests(unittest.TestCase):
     def test_deployment_and_docs_files_exist(self):
         expected_paths = [
             ".github/workflows/ci.yml",
+            ".streamlit/config.toml",
             ".dockerignore",
             "Dockerfile",
             "docker-compose.yml",
