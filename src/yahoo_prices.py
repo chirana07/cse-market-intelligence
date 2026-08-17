@@ -109,6 +109,14 @@ class YahooCSEClient:
             f"{root}-N0000.CM",
         ]
 
+    def _safe_float(self, value: Any) -> float | None:
+        try:
+            if value is None or value == "":
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     def get_quote(self, user_symbol: str) -> Quote:
         universe_df = self.load_universe()
         canonical_symbol = self.resolve_symbol_from_universe(user_symbol, universe_df)
