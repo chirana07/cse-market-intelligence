@@ -155,158 +155,114 @@ if isinstance(portfolio_snapshot_df, pd.DataFrame) and not portfolio_snapshot_df
     if "weight_pct" in portfolio_snapshot_df.columns and not portfolio_snapshot_df["weight_pct"].dropna().empty:
         portfolio_top_weight = float(portfolio_snapshot_df["weight_pct"].dropna().max())
 
-active_symbol = get_active_symbol()
-active_company = get_active_company_name()
-
 # ─── Hero Header ────────────────────────────────────────
 page_header(
     "CSE Command Center",
-    "Your daily starting point — market context, key disclosures, alerts, and portfolio intelligence.",
+    "Executive market dashboard — select any company for live technical indicators, recent disclosures, and monitoring.",
 )
 
-# Quick CTA row
-hero_c1, hero_c2, hero_c3, hero_c4 = st.columns([2, 1, 1, 1])
-with hero_c2:
-    if st.button("Stock Research", use_container_width=True):
-        st.switch_page("src/views/stock_research.py")
-with hero_c3:
-    if st.button("Disclosures", use_container_width=True):
-        st.switch_page("src/views/announcements_hub.py")
-with hero_c4:
-    if st.button("Ask Copilot", use_container_width=True):
-        st.switch_page("src/views/analyst_workspace.py")
-
-# ─── Active Context Bar ──────────────────────────────────
+active_symbol = get_active_symbol()
+active_company = get_active_company_name()
 context_bar(active_symbol, active_company)
 
-# ─── KPI Strip ──────────────────────────────────────────
-kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
-kpi1.metric("Configured Alerts", len(alerts_df))
-kpi2.metric("Triggered Now", len(triggered_df))
-kpi3.metric("Recent Disclosures", len(ann_df) if isinstance(ann_df, pd.DataFrame) else 0)
+# ─── Top Executive KPI Cards ────────────────────────────
+kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+kpi1.metric("Listed Companies", len(universe_df) if isinstance(universe_df, pd.DataFrame) else 294)
+kpi2.metric("Latest Disclosures", len(ann_df) if isinstance(ann_df, pd.DataFrame) else 0)
+kpi3.metric("Triggered Alerts", len(triggered_df), f"{len(alerts_df)} Active Rules")
 kpi4.metric(
     "Portfolio Value",
     f"LKR {_fmt_num(portfolio_market_value)}" if portfolio_market_value else "—",
 )
-kpi5.metric(
-    "Top Holding",
-    _fmt_pct(portfolio_top_weight) if portfolio_top_weight else "—",
-)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ─── Main Content: Left + Right ──────────────────────────
-main_left, main_right = st.columns([3, 2])
+# ─── Main Content Layout (65% Left / 35% Right) ────────
+main_left, main_right = st.columns([1.8, 1.0])
 
 with main_left:
-    # ── Stock Opener ─────────────────────────────────────
-    section_header("Quick Research Launcher")
+    section_header("Equity Research Launcher")
 
     final_symbol, company_name = render_company_selector(universe_df, key_prefix="cc_launcher")
 
-    qcol1, qcol2, qcol3 = st.columns(3)
-    if qcol1.button("Stock Research", use_container_width=True, disabled=not final_symbol, key="cc_stock_btn"):
-        send_to_stock_research(final_symbol, company_name or final_symbol)
-    if qcol2.button("Announcements", use_container_width=True, disabled=not company_name, key="cc_ann_btn"):
-        send_to_announcements(company_name, final_symbol)
-    if qcol3.button("Ask Copilot", use_container_width=True, disabled=not final_symbol, key="cc_copilot_btn"):
-        send_to_analyst_workspace(
-            company_name or final_symbol, final_symbol,
-            analysis_mode="News Summary",
-            query=f"Build a CSE research snapshot for {company_name or final_symbol}.",
-        )
-
     if final_symbol:
-        try:
-            hist_cc = get_history_cached(final_symbol, period="6m")
-            if not hist_cc.empty:
-                tech_cc = generate_technical_signals(hist_cc)
-                divider_label(f"Quantitative Technical Analysis — {final_symbol}")
-                t1, t2, t3 = st.columns(3)
-                t1.metric("RSI (14D)", f"{tech_cc['rsi']:.1f}", tech_cc["rsi_signal"])
-                t2.metric("MACD Crossover", tech_cc["macd_signal"])
-                t3.metric("Moving Avg Signal", "Golden Cross (Bullish)" if tech_cc["golden_cross"] else ("Death Cross (Bearish)" if tech_cc["death_cross"] else "Neutral"))
-        except Exception:
-            pass
+        hist_cc = get_history_cached(final_symbol, period="6m")
+        if not hist_cc.empty:
+            tech_cc = generate_technical_signals(hist_cc)
+            t1, t2, t3 = st.columns(3)
+            t1.metric("RSI (14D)", f"{tech_cc['rsi']:.1f}", tech_cc["rsi_signal"])
+            t2.metric("MACD Crossover", tech_cc["macd_signal"])
+            t3.metric("Moving Avg", "Golden Cross" if tech_cc["golden_cross"] else ("Death Cross" if tech_cc["death_cross"] else "Neutral"))
 
-    divider_label("High-Priority Disclosures")
+        qcol1, qcol2, qcol3 = st.columns(3)
+        if qcol1.button("Stock Research Hub", use_container_width=True, key="cc_stock_btn", type="primary"):
+            send_to_stock_research(final_symbol, company_name or final_symbol)
+        if qcol2.button("Company Disclosures", use_container_width=True, key="cc_ann_btn"):
+            send_to_announcements(company_name, final_symbol)
+        if qcol3.button("Ask AI Copilot", use_container_width=True, key="cc_copilot_btn"):
+            send_to_analyst_workspace(
+                company_name or final_symbol, final_symbol,
+                analysis_mode="News Summary",
+                query=f"Build a CSE research snapshot for {company_name or final_symbol}.",
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    section_header("High-Priority Disclosures Feed")
 
     if ann_df.empty:
         empty_state("", "No disclosures loaded", "Disclosures will appear here when fetched from the CSE.")
     else:
         high_df = ann_df[ann_df["importance_label"] == "High"].copy()
-        if high_df.empty:
-            empty_state("", "No high-priority disclosures", "All clear — no material events detected in the latest feed.")
-        else:
-            for card_idx, (_, row) in enumerate(high_df.head(7).iterrows()):
-                co = str(row.get("company_name", "")).strip()
-                tk = str(row.get("mapped_ticker", "")).strip()
-                ttl = str(row.get("announcement_title", "")).strip()
-                dt = str(row.get("announcement_date", "")).strip()
-                cat = str(row.get("category", "")).strip()
-                detail_url = str(row.get("detail_url", "")).strip()
-                pdf_url = str(row.get("pdf_url", "")).strip()
+        display_df = high_df if not high_df.empty else ann_df
+        for card_idx, (_, row) in enumerate(display_df.head(6).iterrows()):
+            co = str(row.get("company_name", "")).strip()
+            tk = str(row.get("mapped_ticker", "")).strip()
+            ttl = str(row.get("announcement_title", "")).strip()
+            dt = str(row.get("announcement_date", "")).strip()
+            cat = str(row.get("category", "")).strip()
+            detail_url = str(row.get("detail_url", "")).strip()
+            pdf_url = str(row.get("pdf_url", "")).strip()
 
-                with st.container(border=True):
-                    badge_html = status_badge("High Priority", "high")
-                    st.markdown(
-                        f"**{co or 'Unknown Company'}** &nbsp;{badge_html}",
-                        unsafe_allow_html=True,
-                    )
-                    st.caption(f"{dt} · {cat} · {tk or 'No ticker'}")
-                    st.write(ttl)
-
-                    act_c1, act_c2, act_c3 = st.columns(3)
-                    if detail_url:
-                        act_c1.link_button("Open", detail_url, use_container_width=True)
-                    elif pdf_url:
-                        act_c1.link_button("PDF", pdf_url, use_container_width=True)
-                    if act_c2.button("Stock Research", key=f"cc_sr_{card_idx}", use_container_width=True, disabled=not tk):
-                        send_to_stock_research(tk, co)
-                    if act_c3.button("Ask Copilot", key=f"cc_cp_{card_idx}", use_container_width=True, disabled=not tk):
-                        send_to_analyst_workspace(
-                            co or tk, tk,
-                            analysis_mode="Catalysts & Risks",
-                            query=f"Analyze this CSE disclosure for {co or tk}: {ttl}",
-                        )
+            with st.container(border=True):
+                c_top1, c_top2 = st.columns([3, 1])
+                c_top1.markdown(f"**{co or 'CSE Listed Company'}** &nbsp;<span class='cc-subtle'>({tk or 'CSE'})</span>", unsafe_allow_html=True)
+                c_top2.markdown(status_badge("High Priority", "high"), unsafe_allow_html=True)
+                st.caption(f"{dt} · {cat}")
+                st.write(ttl)
+                if detail_url or pdf_url:
+                    st.link_button("Open Official Announcement PDF", detail_url or pdf_url)
 
 with main_right:
-    section_header("Navigate")
+    section_header("Quick Navigation")
 
-    nav_c1, nav_c2 = st.columns(2)
     pages_map = [
-        ("Stock Research", "src/views/stock_research.py"),
-        ("Document Intelligence", "src/views/report_intelligence.py"),
-        ("Portfolio & Screener", "src/views/portfolio_intelligence.py"),
-        ("Copilot & Monitoring", "src/views/analyst_workspace.py"),
+        ("Stock Research", "Analyze stocks, financials, and technical charts", "src/views/stock_research.py"),
+        ("Document Intelligence", "Extract tables, facts, and interim key figures", "src/views/report_intelligence.py"),
+        ("Portfolio & Screener", "Track holdings, risk metrics, and stock screeners", "src/views/portfolio_intelligence.py"),
+        ("Copilot & Monitoring", "AI agent memo workspace and system alerts", "src/views/analyst_workspace.py"),
     ]
-    for i, (label, target) in enumerate(pages_map):
-        col = nav_c1 if i % 2 == 0 else nav_c2
-        if col.button(f"{label}", use_container_width=True, key=f"nav_{i}"):
-            st.switch_page(target)
+    for i, (label, desc, target) in enumerate(pages_map):
+        with st.container(border=True):
+            st.markdown(f"**{label}**")
+            st.caption(desc)
+            if st.button(f"Go to {label}", key=f"nav_btn_{i}", use_container_width=True):
+                st.switch_page(target)
 
-    divider_label("Triggered Alerts")
+    st.markdown("<br>", unsafe_allow_html=True)
+    section_header("Triggered Alerts")
 
     if triggered_df.empty:
-        empty_state("", "No alerts triggered", "All monitoring conditions are within bounds.")
+        empty_state("", "All Clear", "No monitoring rule thresholds triggered.")
     else:
-        for a_idx, (_, row) in enumerate(triggered_df.head(6).iterrows()):
+        for a_idx, (_, row) in enumerate(triggered_df.head(4).iterrows()):
             co = str(row.get("company_name", "")).strip()
             tk = str(row.get("canonical_symbol", "")).strip()
             reason = str(row.get("reason", "")).strip()
 
             with st.container(border=True):
-                badge_html = status_badge("Alert", "triggered")
-                st.markdown(
-                    f"**{co or tk}** &nbsp;{badge_html}",
-                    unsafe_allow_html=True,
-                )
-                st.caption(tk)
+                st.markdown(f"**{co or tk}** {status_badge('Alert', 'triggered')}", unsafe_allow_html=True)
                 st.caption(reason)
-                al_c1, al_c2 = st.columns(2)
-                if al_c1.button("Research", key=f"cc_al_sr_{a_idx}", use_container_width=True):
-                    send_to_stock_research(tk, co)
-                if al_c2.button("Review", key=f"cc_al_cp_{a_idx}", use_container_width=True):
+                if st.button("Investigate in Copilot", key=f"cc_al_cp_{a_idx}", use_container_width=True):
                     send_to_analyst_workspace(
                         co or tk, tk,
                         analysis_mode="Catalysts & Risks",
