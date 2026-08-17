@@ -15,14 +15,15 @@ from src.app_state import (
     send_to_stock_research,
 )
 from src.ui import (
-    inject_global_styles,
-    page_header,
-    section_header,
-    info_card,
-    status_badge,
-    empty_state,
     context_bar,
     divider_label,
+    empty_state,
+    info_card,
+    inject_global_styles,
+    page_header,
+    render_company_selector,
+    section_header,
+    status_badge,
 )
 
 
@@ -39,12 +40,18 @@ client = YahooCSEClient(universe_path=UNIVERSE_PATH)
 
 @st.cache_data(ttl=3600)
 def load_universe_cached(path: str) -> pd.DataFrame:
-    return YahooCSEClient(universe_path=path).load_universe()
+    try:
+        return YahooCSEClient(universe_path=path).load_universe()
+    except Exception:
+        return pd.DataFrame(columns=["symbol", "company_name"])
 
 
 @st.cache_data(ttl=300)
 def load_announcements_cached() -> pd.DataFrame:
-    return CSEAnnouncementsClient().fetch_announcements("All")
+    try:
+        return CSEAnnouncementsClient(timeout=10).fetch_announcements("All")
+    except Exception:
+        return pd.DataFrame()
 
 
 def score_importance(title: str, category: str) -> str:
@@ -98,7 +105,7 @@ def _fmt_pct(value):
 universe_df = load_universe_cached(str(UNIVERSE_PATH))
 ann_df = load_announcements_cached()
 
-if not ann_df.empty:
+if isinstance(ann_df, pd.DataFrame) and not ann_df.empty:
     ann_df = ann_df.copy()
     ann_df["mapped_ticker"] = ann_df["company_name"].apply(
         lambda x: map_company_to_ticker(str(x), universe_df)
@@ -114,11 +121,16 @@ if not ann_df.empty:
         ann_df = ann_df.sort_values(
             by="announcement_date_parsed", ascending=False, na_position="last"
         ).reset_index(drop=True)
+else:
+    ann_df = pd.DataFrame()
 
-alerts_df, triggered_df = evaluate_alerts(
-    universe_path=UNIVERSE_PATH,
-    file_path=ALERTS_FILE,
-)
+try:
+    alerts_df, triggered_df = evaluate_alerts(
+        universe_path=UNIVERSE_PATH,
+        file_path=ALERTS_FILE,
+    )
+except Exception:
+    alerts_df, triggered_df = pd.DataFrame(), pd.DataFrame()
 
 portfolio_snapshot_df = st.session_state.get("portfolio_snapshot_df", pd.DataFrame())
 portfolio_market_value = None
@@ -175,49 +187,7 @@ with main_left:
     # ── Stock Opener ─────────────────────────────────────
     section_header("Quick Research Launcher")
 
-    search_col1, search_col2 = st.columns([3, 1])
-
-    search_text = search_col1.text_input(
-        "Search company or symbol",
-        placeholder="e.g. John Keells, JKH, COMB",
-        label_visibility="collapsed",
-    )
-
-    matches = universe_df.copy()
-    if search_text.strip():
-        q = search_text.strip().upper()
-        matches = matches[
-            matches["symbol"].str.contains(q, na=False)
-            | matches["company_name"].str.upper().str.contains(q, na=False)
-        ]
-
-    option_map = {
-        f"{row['company_name']} ({row['symbol']})": row["symbol"]
-        for _, row in matches.head(100).iterrows()
-    }
-
-    selected_label = search_col1.selectbox(
-        "Pick company",
-        options=[""] + list(option_map.keys()),
-        index=0,
-        label_visibility="collapsed",
-        placeholder="Select a company…",
-    )
-
-    manual_symbol = search_col2.text_input(
-        "Or type symbol",
-        placeholder="JKH",
-        label_visibility="collapsed",
-    )
-
-    typed_symbol = client.normalize_symbol_text(manual_symbol)
-    selected_symbol = option_map.get(selected_label, "")
-    final_symbol = (
-        client.resolve_symbol_from_universe(typed_symbol, universe_df)
-        if typed_symbol
-        else selected_symbol
-    )
-    company_name = client.get_company_name(final_symbol, universe_df) if final_symbol else ""
+    final_symbol, company_name = render_company_selector(universe_df, key_prefix="cc_launcher")
 
     qcol1, qcol2, qcol3 = st.columns(3)
     if qcol1.button("Stock Research", use_container_width=True, disabled=not final_symbol, key="cc_stock_btn"):
@@ -273,19 +243,14 @@ with main_left:
                         )
 
 with main_right:
-    # ── Module Launcher ────────────────────────────────
     section_header("Navigate")
 
     nav_c1, nav_c2 = st.columns(2)
     pages_map = [
         ("Stock Research", "src/views/stock_research.py"),
-        ("Announcements", "src/views/announcements_hub.py"),
-        ("Screener", "src/views/stock_screener.py"),
-        ("Portfolio", "src/views/portfolio_intelligence.py"),
-        ("Reports", "src/views/report_intelligence.py"),
-        ("Alerts", "src/views/alerts_monitoring.py"),
-        ("Market Data", "src/views/market_dashboard.py"),
-        ("Copilot", "src/views/analyst_workspace.py"),
+        ("Document Intelligence", "src/views/report_intelligence.py"),
+        ("Portfolio & Screener", "src/views/portfolio_intelligence.py"),
+        ("Copilot & Monitoring", "src/views/analyst_workspace.py"),
     ]
     for i, (label, target) in enumerate(pages_map):
         col = nav_c1 if i % 2 == 0 else nav_c2
@@ -362,6 +327,3 @@ with bot_right:
         )
         if st.button("Manage Alerts & Monitoring", use_container_width=True, key="cc_alerts_manage"):
             st.switch_page("src/views/alerts_monitoring.py")
-
-with st.expander("Debug Info"):
-    st.caption(f"Universe rows: {len(universe_df)} · Announcements: {len(ann_df)} · Alerts: {len(alerts_df)} · Triggered: {len(triggered_df)}")

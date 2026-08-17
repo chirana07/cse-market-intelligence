@@ -6,6 +6,7 @@ import streamlit as st
 
 from src.report_intelligence import (
     compare_reports,
+    extract_interim_key_figures,
     extract_pdf_text_from_bytes,
     extract_pdf_text_from_url,
     summarize_report,
@@ -17,7 +18,8 @@ from src.persistence import (
     load_report_artifacts,
     save_report_artifacts,
 )
-from src.ui import inject_global_styles, page_header
+from src.cse_announcements import CSEAnnouncementsClient, CATEGORY_URLS
+from src.ui import context_bar, empty_state, inject_global_styles, page_header, render_company_selector
 from src.app_state import send_to_analyst_workspace, set_active_symbol
 
 
@@ -30,6 +32,9 @@ UNIVERSE_PATH = BASE_DIR / "data" / "cse_universe.csv"
 
 if "report_summary_output" not in st.session_state:
     st.session_state.report_summary_output = ""
+
+if "interim_key_figures_output" not in st.session_state:
+    st.session_state.interim_key_figures_output = ""
 
 if "report_compare_output" not in st.session_state:
     st.session_state.report_compare_output = ""
@@ -107,66 +112,24 @@ def lookup_company_from_symbol(symbol: str, universe_df: pd.DataFrame) -> str:
 
 page_header(
     "CSE Report Intelligence",
-    "Upload or link annual / interim report PDFs, summarize them, and compare reporting periods.",
+    "Upload or link annual / interim report PDFs, summarize key facts, and compare reporting periods.",
 )
 
 universe_df = load_universe(str(UNIVERSE_PATH))
 
-with st.expander("Universe debug"):
-    st.write(f"Universe rows: {len(universe_df)}")
-    if not universe_df.empty:
-        st.dataframe(universe_df.head(10), use_container_width=True, hide_index=True)
+sel_col, type_col = st.columns([3, 1])
+with sel_col:
+    final_symbol, company_name = render_company_selector(universe_df, key_prefix="rpt_sel")
+with type_col:
+    report_type = st.selectbox(
+        "Report Type",
+        ["Interim Report", "Annual Report", "Quarterly Report", "Other"],
+    )
 
-top_col1, top_col2, top_col3 = st.columns([2, 1, 1])
+context_bar(final_symbol, company_name)
 
-search_text = top_col1.text_input(
-    "Search company or symbol",
-    placeholder="e.g. John Keells, JKH, COMB",
-)
+main_tab1, main_tab2, main_tab3 = st.tabs(["Single Report Analysis", "Compare Reports", "CSE Disclosures Feed"])
 
-universe_matches = universe_df.copy()
-if search_text.strip():
-    q = search_text.strip().upper()
-    universe_matches = universe_matches[
-        universe_matches["symbol"].str.contains(q, na=False)
-        | universe_matches["company_name"].str.upper().str.contains(q, na=False)
-    ]
-
-option_map = {
-    f"{row['company_name']} ({row['symbol']})": row["symbol"]
-    for _, row in universe_matches.head(100).iterrows()
-}
-
-selected_label = top_col1.selectbox(
-    "Pick from company universe",
-    options=[""] + list(option_map.keys()),
-    index=0,
-)
-
-manual_symbol = top_col2.text_input(
-    "Or type symbol / alias",
-    placeholder="e.g. JKH, JKH.N, JKH.N0000",
-)
-
-report_type = top_col3.selectbox(
-    "Report Type",
-    ["Annual Report", "Interim Report", "Quarterly Report", "Other"],
-)
-
-typed_symbol = normalize_symbol_text(manual_symbol)
-selected_symbol = option_map.get(selected_label, "")
-final_symbol = (
-    resolve_symbol_from_universe(typed_symbol, universe_df)
-    if typed_symbol
-    else selected_symbol
-)
-
-company_name = lookup_company_from_symbol(final_symbol, universe_df) if final_symbol else ""
-
-if final_symbol or company_name:
-    set_active_symbol(final_symbol, company_name)
-
-main_tab1, main_tab2, main_tab3 = st.tabs(["Single Report", "Compare Reports", "Debug"])
 
 with main_tab1:
     st.subheader("Single Report Analysis")
@@ -182,7 +145,11 @@ with main_tab1:
         key="latest_upload_pdf",
     )
 
-    if st.button("Analyze Report", use_container_width=True):
+    btn_col1, btn_col2 = st.columns(2)
+    analyze_clicked = btn_col1.button("Analyze Report", use_container_width=True)
+    interim_clicked = btn_col2.button("Extract Key Interim Figures", use_container_width=True)
+
+    if analyze_clicked or interim_clicked:
         if not latest_report_url.strip() and latest_upload is None:
             st.warning("Provide a report PDF URL or upload a PDF.")
         else:
@@ -200,6 +167,7 @@ with main_tab1:
                     summary = cached.get("summary", "")
                     event = cached.get("event", {})
                     financials = cached.get("financials", {})
+                    interim_kf = cached.get("interim_key_figures", "")
                     st.session_state.report_summary_cache_status = "Loaded from AI cache"
                 else:
                     if latest_upload is not None:
@@ -207,48 +175,79 @@ with main_tab1:
                     else:
                         latest_text = extract_pdf_text_from_url(latest_report_url.strip())
 
-                    with st.spinner("Generating report intelligence..."):
-                        summary = summarize_report(
-                            company_name=company_name,
-                            ticker=final_symbol,
-                            report_type=report_type,
-                            report_text=latest_text,
-                        )
-                        event = extract_events_from_report(
-                            company_name=company_name,
-                            ticker=final_symbol,
-                            report_type=report_type,
-                            text=latest_text,
-                        )
-                        financials = extract_financial_facts_from_report(
-                            company_name=company_name,
-                            ticker=final_symbol,
-                            report_type=report_type,
-                            text=latest_text,
-                        )
-                    
+                    summary = cached.get("summary", "") if cached else ""
+                    event = cached.get("event", {}) if cached else {}
+                    financials = cached.get("financials", {}) if cached else {}
+                    interim_kf = cached.get("interim_key_figures", "") if cached else ""
+
+                    if interim_clicked and not interim_kf:
+                        with st.spinner("Extracting Key Interim Figures with AI analyst engine..."):
+                            interim_kf = extract_interim_key_figures(
+                                company_name=company_name,
+                                ticker=final_symbol,
+                                report_text=latest_text,
+                            )
+
+                    if analyze_clicked and not summary:
+                        with st.spinner("Generating full report intelligence & financial facts..."):
+                            summary = summarize_report(
+                                company_name=company_name,
+                                ticker=final_symbol,
+                                report_type=report_type,
+                                report_text=latest_text,
+                            )
+                            event = extract_events_from_report(
+                                company_name=company_name,
+                                ticker=final_symbol,
+                                report_type=report_type,
+                                text=latest_text,
+                            )
+                            financials = extract_financial_facts_from_report(
+                                company_name=company_name,
+                                ticker=final_symbol,
+                                report_type=report_type,
+                                text=latest_text,
+                            )
+                            if not interim_kf:
+                                interim_kf = extract_interim_key_figures(
+                                    company_name=company_name,
+                                    ticker=final_symbol,
+                                    report_text=latest_text,
+                                )
+
                     save_report_artifacts(
                         cache_key=cache_key,
                         text=latest_text,
                         summary=summary,
                         event=event,
                         financials=financials,
-                        meta={"company_name": company_name, "ticker": final_symbol, "report_label": latest_label}
+                        meta={"company_name": company_name, "ticker": final_symbol, "report_label": latest_label},
+                        interim_key_figures=interim_kf,
                     )
                     st.session_state.report_summary_cache_status = "Fresh analysis generated"
 
                 st.session_state.latest_report_text = latest_text
                 st.session_state.latest_report_label = latest_label
-                st.session_state.report_summary_output = summary
-                st.session_state.selected_report_event = event
-                st.session_state.selected_report_financials = financials
+                if summary:
+                    st.session_state.report_summary_output = summary
+                if interim_kf:
+                    st.session_state.interim_key_figures_output = interim_kf
+                if event:
+                    st.session_state.selected_report_event = event
+                if financials:
+                    st.session_state.selected_report_financials = financials
             except Exception as e:
                 st.error(f"Failed to analyze report: {e}")
 
-    if st.session_state.report_summary_output:
+    if st.session_state.report_summary_output or st.session_state.interim_key_figures_output:
         st.markdown(f"### {company_name or final_symbol or 'Selected Company'}")
         if final_symbol:
             st.caption(f"Resolved ticker: {final_symbol}")
+
+        if st.session_state.interim_key_figures_output:
+            st.markdown("#### Interim Financial Report – Key Figures Analysis")
+            st.markdown(st.session_state.interim_key_figures_output)
+            st.markdown("---")
 
         selected_event = st.session_state.get("selected_report_event")
         if selected_event:
@@ -319,6 +318,15 @@ with main_tab1:
         if action_col1.button("Send Summary to Analyst Workspace", use_container_width=True):
             summary_text = st.session_state.report_summary_output
             starter = summary_text[:2500] if summary_text else f"Analyze the latest report for {company_name or final_symbol}."
+            send_to_analyst_workspace(
+                company_name=company_name,
+                ticker=final_symbol,
+                analysis_mode="Portfolio Memo",
+                query=starter,
+            )
+        if action_col2.button("Send Key Figures to Analyst Workspace", use_container_width=True):
+            kf_text = st.session_state.interim_key_figures_output
+            starter = kf_text[:2500] if kf_text else f"Interim Key Figures for {company_name or final_symbol}."
             send_to_analyst_workspace(
                 company_name=company_name,
                 ticker=final_symbol,
@@ -409,8 +417,28 @@ with main_tab2:
             st.write((st.session_state.previous_report_text or "")[:5000] or "No text extracted.")
 
 with main_tab3:
-    st.subheader("Debug")
-    st.write("Resolved symbol:", final_symbol)
-    st.write("Resolved company:", company_name)
-    st.write("Latest text length:", len(st.session_state.latest_report_text or ""))
-    st.write("Previous text length:", len(st.session_state.previous_report_text or ""))
+    st.subheader("Official CSE Disclosures Feed")
+
+    cat_col1, cat_col2 = st.columns([2, 1])
+    selected_cat = cat_col1.selectbox("Category", list(CATEGORY_URLS.keys()), key="doc_intel_cat")
+    search_kw = cat_col2.text_input("Filter Keyword", placeholder="e.g. Dividend, Interim, Rights", key="doc_intel_kw")
+
+    try:
+        with st.spinner("Fetching disclosures feed..."):
+            feed_df = CSEAnnouncementsClient(timeout=10).fetch_announcements(selected_cat)
+    except Exception:
+        feed_df = pd.DataFrame()
+
+    if isinstance(feed_df, pd.DataFrame) and not feed_df.empty:
+        filtered_df = feed_df.copy()
+        if search_kw.strip():
+            kw_q = search_kw.strip().upper()
+            filtered_df = filtered_df[
+                filtered_df["announcement_title"].astype(str).str.upper().str.contains(kw_q, na=False)
+                | filtered_df["company_name"].astype(str).str.upper().str.contains(kw_q, na=False)
+            ]
+        
+        display_cols = [c for c in ["announcement_date", "company_name", "category", "announcement_title"] if c in filtered_df.columns]
+        st.dataframe(filtered_df[display_cols].head(50), use_container_width=True, hide_index=True)
+    else:
+        empty_state("No Disclosures", "No announcements currently parsed for this category.", "Try selecting 'All' or retry network request.")

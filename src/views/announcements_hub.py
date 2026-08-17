@@ -20,8 +20,8 @@ from src.persistence import (
     load_announcement_artifacts,
     save_announcement_artifacts,
 )
-from src.ui import inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label, chip_row
-from src.app_state import send_to_analyst_workspace, send_to_stock_research, set_active_symbol
+from src.ui import context_bar, inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label, chip_row
+from src.app_state import send_to_analyst_workspace, send_to_stock_research, set_active_symbol, get_active_symbol, get_active_company_name
 
 
 
@@ -52,6 +52,7 @@ page_header(
     "CSE Announcements Hub",
     "Official CSE disclosure feed — search, analyze, and extract intelligence from announcements.",
 )
+context_bar(get_active_symbol(), get_active_company_name())
 
 
 @st.cache_data(ttl=300)
@@ -274,20 +275,11 @@ with st.spinner("Loading official CSE announcements..."):
     announcements_df = load_announcements(selected_category)
 
 if announcements_df.empty:
-    st.warning("No announcement rows were parsed from the current CSE page.")
-
-    debug_dir = Path("data/debug")
-    text_file = debug_dir / "last_cse_announcements_visible_text.txt"
-    html_file = debug_dir / "last_cse_announcements_rendered.html"
-
-    with st.expander("Debug files preview"):
-        st.write(f"Visible text file exists: {text_file.exists()}")
-        st.write(f"Rendered HTML file exists: {html_file.exists()}")
-
-        if text_file.exists():
-            preview = text_file.read_text(encoding="utf-8", errors="ignore")
-            st.text(preview[:4000])
-
+    empty_state(
+        "No Announcements",
+        "No announcement rows were parsed from the current CSE page.",
+        "Select a different category or check network connection to retry.",
+    )
     st.stop()
 
 work = announcements_df.copy()

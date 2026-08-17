@@ -6,7 +6,7 @@ import streamlit as st
 import plotly.graph_objects as go
 
 from src.yahoo_prices import YahooCSEClient
-from src.ui import inject_global_styles, page_header
+from src.ui import context_bar, inject_global_styles, page_header, render_company_selector
 from src.app_state import send_to_analyst_workspace, send_to_stock_research, set_active_symbol
 
 
@@ -201,55 +201,12 @@ def _build_normalized_compare(compare_frames: dict[str, pd.DataFrame]):
 
 universe_df = load_universe_cached(str(UNIVERSE_PATH))
 
-with st.expander("Universe debug"):
-    st.write(f"Universe path: {UNIVERSE_PATH}")
-    st.write(f"Universe rows: {len(universe_df)}")
-    if not universe_df.empty:
-        st.dataframe(universe_df, use_container_width=True, hide_index=True)
-
 tabs = st.tabs(["Single Stock", "Watchlist", "Symbol Helper"])
 
 with tabs[0]:
     st.subheader("Single Stock Lookup")
-
-    search_col, symbol_col = st.columns([2, 1])
-
-    search_text = search_col.text_input(
-        "Search company or symbol from full CSE universe",
-        placeholder="e.g. John Keells, Commercial Bank, JKH, COMB",
-    )
-
-    matches = universe_df.copy()
-    if search_text.strip():
-        q = search_text.strip().upper()
-        matches = matches[
-            matches["symbol"].str.contains(q, na=False)
-            | matches["company_name"].str.upper().str.contains(q, na=False)
-        ]
-
-    option_map = {
-        f"{row['company_name']} ({row['symbol']})": row["symbol"]
-        for _, row in matches.head(100).iterrows()
-    }
-
-    selected_label = search_col.selectbox(
-        "Pick from full company universe",
-        options=[""] + list(option_map.keys()),
-        index=0,
-    )
-
-    manual_symbol = symbol_col.text_input(
-        "Or type symbol / alias",
-        placeholder="e.g. JKH, JKH.N, JKH.N0000",
-    )
-
-    typed_symbol = client.normalize_symbol_text(manual_symbol)
-    selected_universe_symbol = option_map.get(selected_label, "")
-    final_symbol = (
-        client.resolve_symbol_from_universe(typed_symbol, universe_df)
-        if typed_symbol
-        else selected_universe_symbol
-    )
+    final_symbol, company_name = render_company_selector(universe_df, key_prefix="mkt_dash")
+    context_bar(final_symbol, company_name)
 
     chart_col1, chart_col2 = st.columns(2)
     period = chart_col1.selectbox("History Period", ["1mo", "3mo", "6mo", "1y", "2y", "5y"], index=2)

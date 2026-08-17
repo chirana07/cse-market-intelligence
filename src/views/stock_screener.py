@@ -7,8 +7,8 @@ import streamlit as st
 from src.yahoo_prices import YahooCSEClient
 from src.cse_announcements import CSEAnnouncementsClient
 from src.screener_utils import build_screening_dataset, apply_nl_screener_hint
-from src.ui import inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label
-from src.app_state import send_to_analyst_workspace, send_to_stock_research
+from src.ui import context_bar, inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label
+from src.app_state import send_to_analyst_workspace, send_to_stock_research, get_active_symbol, get_active_company_name
 from src.persistence import build_report_cache_key, load_report_artifacts
 
 
@@ -25,6 +25,7 @@ page_header(
     "CSE Stock Screener",
     "Filter the CSE universe by price action, liquidity, and disclosure signals to surface research ideas.",
 )
+context_bar(get_active_symbol(), get_active_company_name())
 
 if "screener_results_df" not in st.session_state:
     st.session_state.screener_results_df = pd.DataFrame()
@@ -208,12 +209,4 @@ else:
                 company_name=selected_row["company_name"],
                 ticker=selected_row["symbol"],
                 analysis_mode="Bull vs Bear Case",
-                query=f"Evaluate whether {selected_row['company_name'] or selected_row['symbol']} looks interesting based on price action, disclosures, and risk/reward.",
             )
-
-with st.expander("Debug Preview"):
-    st.write(f"Universe rows: {len(universe_df)}")
-    st.write(f"Announcements rows: {len(announcements_df)}")
-    st.write(f"Screening dataset rows: {len(screen_df)}")
-    if not screen_df.empty:
-        st.dataframe(screen_df.head(10), use_container_width=True, hide_index=True)

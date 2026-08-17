@@ -183,3 +183,120 @@ Answer:
 
     result = llm.invoke(prompt)
     return result.content if hasattr(result, "content") else str(result)
+
+
+def extract_interim_key_figures(
+    company_name: str,
+    ticker: str,
+    report_text: str,
+) -> str:
+    """Extract investor key figures, growth, margins, main drivers, and investor snapshot from an interim financial report."""
+    llm = _get_llm()
+    clipped = (report_text or "")[:25000]
+
+    prompt = f"""
+You are a financial analyst with strong knowledge of accounting principles, financial statement analysis, and interim financial reporting.
+
+I will provide you with an interim financial report of a company. Your job is to extract only the most important financial figures and performance indicators that an investor would need to quickly understand the company's performance.
+
+## 1. First identify the reporting periods correctly
+Before calculating anything, determine:
+* Current reporting quarter
+* Previous quarter
+* Corresponding quarter of the previous year
+* Current year-to-date (YTD) period
+* Corresponding YTD period of the previous year
+
+Be extremely careful with statements containing both:
+* "Quarter ended" figures, and
+* "Period/Year-to-date ended" figures
+
+Never compare a 3-month figure with a 6-month, 9-month, or 12-month cumulative figure.
+
+## 2. Extract the most important figures
+Focus primarily on:
+
+### Revenue
+* Revenue for the current quarter
+* Revenue for the previous quarter, if available
+* Revenue for the same quarter last year
+* Quarter-on-Quarter (QoQ) revenue growth %: ((Current Quarter Revenue - Previous Quarter Revenue) / Previous Quarter Revenue) * 100
+* Year-on-Year (YoY) revenue growth %: ((Current Quarter Revenue - Same Quarter Last Year Revenue) / Same Quarter Last Year Revenue) * 100
+
+### Profit After Tax – PAT
+Extract:
+* Current quarter PAT, previous quarter PAT (if available), same quarter last year PAT
+* QoQ PAT growth and YoY PAT growth
+* If the company moves from a loss to a profit or from a profit to a loss, do NOT give a misleading percentage increase/decrease. Instead state:
+  - Turned profitable
+  - Turned loss-making
+  - Loss narrowed
+  - Loss widened
+  as appropriate.
+
+### Profitability
+Extract when available:
+* Gross Profit, Operating Profit, Profit Before Tax (PBT), Profit After Tax (PAT)
+Calculate useful margins:
+* Gross Margin = Gross Profit / Revenue * 100
+* Operating Margin = Operating Profit / Revenue * 100
+* Net Profit Margin = PAT / Revenue * 100
+Mention significant margin expansion or contraction compared with the relevant previous period.
+
+## 3. Other important financial figures
+Only include these when they are available and materially useful:
+* EPS, Total Assets, Total Liabilities, Shareholders' Equity / Net Assets, Cash and Cash Equivalents, Borrowings / Interest-bearing debt, Finance Costs, Operating Cash Flow, Capital Expenditure, Dividend per share.
+For banks, finance companies, insurers, or other specialized businesses, adapt the analysis to relevant accounting measures.
+
+## 4. Identify the main drivers
+Read the income statement and notes to identify WHY profits changed (revenue growth or decline, cost of sales changes, gross margin changes, admin expenses, selling/distribution expenses, finance costs, other income, foreign exchange gains/losses, fair-value gains/losses, impairment charges, tax changes, one-off/non-recurring gains or expenses).
+Separate operating improvement from profits caused mainly by one-off items.
+
+## 5. Accounting rules
+Do NOT:
+* Mix quarterly figures with YTD figures.
+* Treat revenue as profit, PBT as PAT, OCI as PAT, cash flow as accounting profit.
+* Calculate misleading growth percentages when the denominator is negative.
+* Assume missing figures or invent numbers.
+* Double-count subsidiaries or group/company figures.
+Use Consolidated / Group figures unless specifically told otherwise.
+If figures are unclear, state that clearly.
+
+## 6. Output format
+Keep the answer concise and investor-focused.
+
+### [COMPANY NAME] – [Reporting Quarter]
+
+| Metric | Current Quarter | Previous Quarter | QoQ | Same Quarter Last Year | YoY |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| Revenue | | | | | |
+| Gross Profit | | | | | |
+| Operating Profit | | | | | |
+| PBT | | | | | |
+| PAT | | | | | |
+| EPS | | | | | |
+
+Use N/A where a valid comparison cannot be established from the report.
+
+Then provide:
+
+### Key Takeaways
+Give only 3–6 important observations (e.g., Revenue, PAT, Net margin, Finance costs, Cash/borrowings, Main driver).
+
+### Investor Snapshot
+Finish with:
+**Overall performance:** Strong / Improving / Stable / Weakening / Weak
+**Reason:** Explain the classification in 1–2 sentences based strictly on the financial statements.
+Do NOT give a Buy/Sell/Hold recommendation.
+
+Company Name: {company_name or "Not specified"}
+Ticker: {ticker or "Not specified"}
+
+Report Text:
+{clipped}
+
+Answer:
+""".strip()
+
+    result = llm.invoke(prompt)
+    return result.content if hasattr(result, "content") else str(result)

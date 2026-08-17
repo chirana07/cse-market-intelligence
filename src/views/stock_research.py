@@ -40,7 +40,7 @@ from src.persistence import (
     save_stock_ai_view,
     _safe_hash,
 )
-from src.ui import inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label, chip_row
+from src.ui import context_bar, inject_global_styles, page_header, render_company_selector, section_header, status_badge, empty_state, divider_label, chip_row
 from src.app_state import send_to_analyst_workspace, set_active_symbol
 
 
@@ -255,45 +255,8 @@ page_header(
     "Unified intelligence page — price history, disclosures, financials, and AI-synthesized insights.",
 )
 
-search_col1, search_col2 = st.columns([2, 1])
-
-search_text = search_col1.text_input(
-    "Search company or symbol",
-    placeholder="e.g. John Keells, JKH, COMB",
-)
-
-matches = universe_df.copy()
-if search_text.strip():
-    q = search_text.strip().upper()
-    matches = matches[
-        matches["symbol"].str.contains(q, na=False)
-        | matches["company_name"].str.upper().str.contains(q, na=False)
-    ]
-
-option_map = {
-    f"{row['company_name']} ({row['symbol']})": row["symbol"]
-    for _, row in matches.head(100).iterrows()
-}
-
-selected_label = search_col1.selectbox(
-    "Pick from company universe",
-    options=[""] + list(option_map.keys()),
-    index=0,
-)
-
-manual_symbol = search_col2.text_input(
-    "Or type symbol / alias",
-    key="stock_research_prefill_symbol",
-    placeholder="e.g. JKH, JKH.N, JKH.N0000",
-)
-
-typed_symbol = yahoo_client.normalize_symbol_text(manual_symbol)
-selected_symbol = option_map.get(selected_label, "")
-final_symbol = (
-    yahoo_client.resolve_symbol_from_universe(typed_symbol, universe_df)
-    if typed_symbol
-    else selected_symbol
-)
+final_symbol, company_name = render_company_selector(universe_df, key_prefix="srch_sel")
+context_bar(final_symbol, company_name)
 
 if not final_symbol:
     st.info("Select a company to open the stock research page.")

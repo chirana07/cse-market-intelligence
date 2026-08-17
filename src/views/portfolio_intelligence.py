@@ -21,8 +21,11 @@ from src.persistence import (
     build_report_cache_key,
     load_report_artifacts,
 )
-from src.ui import inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label
-from src.app_state import send_to_analyst_workspace, send_to_stock_research
+from src.ui import context_bar, inject_global_styles, page_header, section_header, status_badge, empty_state, divider_label
+from src.app_state import send_to_analyst_workspace, send_to_stock_research, get_active_symbol, get_active_company_name
+from src.screener_utils import build_screening_dataset, apply_nl_screener_hint
+from src.yahoo_prices import YahooCSEClient
+from src.cse_announcements import CSEAnnouncementsClient
 
 
 
@@ -99,8 +102,10 @@ page_header(
     "Portfolio Intelligence",
     "Upload your CSE holdings, analyze allocation and concentration risk, and get an AI portfolio review.",
 )
+port_tab1, port_tab2 = st.tabs(["Portfolio Holdings & Risk", "Stock Screener"])
 
-upload_col1, upload_col2 = st.columns([2, 1])
+with port_tab1:
+    upload_col1, upload_col2 = st.columns([2, 1])
 
 uploaded_csv = upload_col1.file_uploader(
     "Upload holdings CSV",
@@ -301,7 +306,38 @@ with tabs[2]:
     else:
         st.info("Generate an AI review to get portfolio insights.")
 
-with tabs[3]:
-    st.subheader("Debug")
-    st.write(f"Rows: {len(snapshot_df)}")
-    st.dataframe(snapshot_df.head(10), use_container_width=True, hide_index=True)
+with port_tab2:
+    st.subheader("CSE Stock Screener")
+
+    scr_col1, scr_col2 = st.columns([2, 1])
+    screener_preset = scr_col1.selectbox(
+        "Screening Preset",
+        ["All Universe", "High 1M Momentum (>10%)", "High 20D Volume", "Recent Disclosures"],
+        key="port_scr_preset",
+    )
+    max_screener_rows = scr_col2.number_input("Max Rows", min_value=10, max_value=250, value=50, step=10, key="port_scr_limit")
+
+    try:
+        with st.spinner("Building screening dataset..."):
+            universe_df_scr = YahooCSEClient(universe_path=UNIVERSE_PATH).load_universe()
+            announcements_df_scr = CSEAnnouncementsClient().fetch_announcements("All")
+            screen_df = build_screening_dataset(
+                universe_df=universe_df_scr,
+                universe_path=UNIVERSE_PATH,
+                announcements_df=announcements_df_scr,
+                limit=int(max_screener_rows),
+            )
+    except Exception:
+        screen_df = pd.DataFrame()
+
+    if isinstance(screen_df, pd.DataFrame) and not screen_df.empty:
+        if screener_preset == "High 1M Momentum (>10%)" and "return_1m_pct" in screen_df.columns:
+            screen_df = screen_df[screen_df["return_1m_pct"] > 10.0]
+        elif screener_preset == "High 20D Volume" and "avg_volume_20d" in screen_df.columns:
+            screen_df = screen_df.sort_values(by="avg_volume_20d", ascending=False)
+        elif screener_preset == "Recent Disclosures" and "announcement_count" in screen_df.columns:
+            screen_df = screen_df[screen_df["announcement_count"] > 0]
+
+        st.dataframe(screen_df, use_container_width=True, hide_index=True)
+    else:
+        empty_state("No Screener Results", "Unable to load screening dataset.", "Check network connectivity or retry.")

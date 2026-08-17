@@ -109,7 +109,7 @@ def load_announcement_artifacts(cache_key: str):
     }
 
 
-def save_report_artifacts(cache_key: str, text: str, summary: str, event: dict, financials: dict, meta: dict):
+def save_report_artifacts(cache_key: str, text: str, summary: str, event: dict, financials: dict, meta: dict, interim_key_figures: str = ""):
     dir_path = REPORTS_DIR / cache_key
     dir_path.mkdir(exist_ok=True)
     
@@ -117,6 +117,8 @@ def save_report_artifacts(cache_key: str, text: str, summary: str, event: dict, 
     save_text(dir_path / "summary.txt", summary)
     save_json(dir_path / "event.json", event)
     save_json(dir_path / "financials.json", financials)
+    if interim_key_figures:
+        save_text(dir_path / "interim_key_figures.txt", interim_key_figures)
     
     meta["created_at"] = datetime.now(timezone.utc).isoformat()
     meta["version"] = CACHE_SCHEMA_VERSION
@@ -135,7 +137,9 @@ def load_report_artifacts(cache_key: str):
         "event": load_json(dir_path / "event.json"),
         "financials": load_json(dir_path / "financials.json"),
         "meta": load_json(dir_path / "meta.json"),
+        "interim_key_figures": load_text(dir_path / "interim_key_figures.txt"),
     }
+
 
 
 def save_stock_ai_view(cache_key: str, ai_view: str, meta: dict):
