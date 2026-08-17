@@ -51,7 +51,23 @@ def load_universe_cached(path: str) -> pd.DataFrame:
 @st.cache_data(ttl=300)
 def load_announcements_cached() -> pd.DataFrame:
     try:
-        return CSEAnnouncementsClient(timeout=10).fetch_announcements("All")
+        return CSEAnnouncementsClient(timeout=4).fetch_announcements("All")
+    except Exception:
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def evaluate_alerts_cached(path: str, file_path: str):
+    try:
+        return evaluate_alerts(universe_path=path, file_path=file_path)
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def get_history_cached(symbol: str, period: str = "6m") -> pd.DataFrame:
+    try:
+        return YahooCSEClient(universe_path=UNIVERSE_PATH).get_history(symbol, period=period)
     except Exception:
         return pd.DataFrame()
 
@@ -126,13 +142,10 @@ if isinstance(ann_df, pd.DataFrame) and not ann_df.empty:
 else:
     ann_df = pd.DataFrame()
 
-try:
-    alerts_df, triggered_df = evaluate_alerts(
-        universe_path=UNIVERSE_PATH,
-        file_path=ALERTS_FILE,
-    )
-except Exception:
-    alerts_df, triggered_df = pd.DataFrame(), pd.DataFrame()
+alerts_df, triggered_df = evaluate_alerts_cached(
+    path=str(UNIVERSE_PATH),
+    file_path=str(ALERTS_FILE),
+)
 
 portfolio_snapshot_df = st.session_state.get("portfolio_snapshot_df", pd.DataFrame())
 portfolio_market_value = None
@@ -205,7 +218,7 @@ with main_left:
 
     if final_symbol:
         try:
-            hist_cc = YahooCSEClient(universe_path=UNIVERSE_PATH).get_history(final_symbol, period="6m")
+            hist_cc = get_history_cached(final_symbol, period="6m")
             if not hist_cc.empty:
                 tech_cc = generate_technical_signals(hist_cc)
                 divider_label(f"Quantitative Technical Analysis — {final_symbol}")
