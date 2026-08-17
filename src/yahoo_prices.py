@@ -96,41 +96,39 @@ class YahooCSEClient:
     # -------------------------
     # Symbol mapping
     # -------------------------
-    def cse_to_yahoo_symbol(self, canonical_symbol: str) -> str:
+    def cse_to_yahoo_symbol_candidates(self, canonical_symbol: str) -> list[str]:
         canonical_symbol = self.normalize_symbol_text(canonical_symbol)
         if canonical_symbol.endswith(".CM"):
-            return canonical_symbol
-        return canonical_symbol.replace(".", "-") + ".CM"
-
-    # -------------------------
-    # Quote/history helpers
-    # -------------------------
-    def _safe_float(self, value: Any) -> float | None:
-        try:
-            if value is None or value == "":
-                return None
-            return float(value)
-        except (TypeError, ValueError):
-            return None
+            return [canonical_symbol]
+        
+        root = self.symbol_root(canonical_symbol)
+        return [
+            canonical_symbol.replace(".", "-") + ".CM",
+            canonical_symbol + ".CM",
+            f"{root}.CM",
+            f"{root}-N0000.CM",
+        ]
 
     def get_quote(self, user_symbol: str) -> Quote:
         universe_df = self.load_universe()
         canonical_symbol = self.resolve_symbol_from_universe(user_symbol, universe_df)
-        yahoo_symbol = self.cse_to_yahoo_symbol(canonical_symbol)
-
-        ticker = yf.Ticker(yahoo_symbol)
-
-        info = {}
-        try:
-            info = ticker.info or {}
-        except Exception:
-            info = {}
+        candidates = self.cse_to_yahoo_symbol_candidates(canonical_symbol)
 
         hist = pd.DataFrame()
-        try:
-            hist = ticker.history(period="5d", interval="1d", auto_adjust=False)
-        except Exception:
-            hist = pd.DataFrame()
+        info = {}
+        selected_yahoo_symbol = candidates[0]
+
+        for cand in candidates:
+            try:
+                ticker = yf.Ticker(cand)
+                cand_hist = ticker.history(period="5d", interval="1d", auto_adjust=False)
+                if cand_hist is not None and not cand_hist.dropna(how="all").empty:
+                    hist = cand_hist
+                    info = ticker.info or {}
+                    selected_yahoo_symbol = cand
+                    break
+            except Exception:
+                continue
 
         company_name = (
             info.get("longName")
@@ -186,13 +184,25 @@ class YahooCSEClient:
             raw_info=info,
         )
 
+    def cse_to_yahoo_symbol(self, canonical_symbol: str) -> str:
+        candidates = self.cse_to_yahoo_symbol_candidates(canonical_symbol)
+        return candidates[0] if candidates else f"{canonical_symbol}.CM"
+
     def get_history(self, user_symbol: str, period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
         universe_df = self.load_universe()
         canonical_symbol = self.resolve_symbol_from_universe(user_symbol, universe_df)
-        yahoo_symbol = self.cse_to_yahoo_symbol(canonical_symbol)
+        candidates = self.cse_to_yahoo_symbol_candidates(canonical_symbol)
 
-        ticker = yf.Ticker(yahoo_symbol)
-        hist = ticker.history(period=period, interval=interval, auto_adjust=False)
+        hist = pd.DataFrame()
+        for cand in candidates:
+            try:
+                ticker = yf.Ticker(cand)
+                cand_hist = ticker.history(period=period, interval=interval, auto_adjust=False)
+                if cand_hist is not None and not cand_hist.dropna(how="all").empty:
+                    hist = cand_hist
+                    break
+            except Exception:
+                continue
 
         if hist is None or hist.empty:
             return pd.DataFrame(columns=["Date", "Open", "High", "Low", "Close", "Volume"])
