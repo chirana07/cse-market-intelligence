@@ -28,3 +28,9 @@ data/alerts_store.json
 
 # Streamlit/local runtime
 .streamlit/secrets.toml
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
