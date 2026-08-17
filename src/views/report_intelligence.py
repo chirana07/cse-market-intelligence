@@ -151,7 +151,7 @@ with main_tab1:
     btn_col1, btn_col2, btn_col3 = st.columns(3)
     analyze_clicked = btn_col1.button("Analyze Full Report", use_container_width=True)
     interim_clicked = btn_col2.button("Extract Interim Figures", use_container_width=True)
-    tearsheet_clicked = btn_col3.button("⚡ Executive Tear Sheet", use_container_width=True, kind="primary")
+    tearsheet_clicked = btn_col3.button("⚡ Executive Tear Sheet", use_container_width=True, type="primary")
 
     if analyze_clicked or interim_clicked or tearsheet_clicked:
         if not latest_report_url.strip() and latest_upload is None:
