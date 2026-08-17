@@ -7,6 +7,8 @@ import streamlit as st
 from src.yahoo_prices import YahooCSEClient
 from src.cse_announcements import CSEAnnouncementsClient
 from src.alerts_engine import evaluate_alerts
+from src.ta_engine import generate_technical_signals
+from src.portfolio_risk import evaluate_portfolio_risk_metrics
 from src.app_state import (
     get_active_company_name,
     get_active_symbol,
@@ -200,6 +202,19 @@ with main_left:
             analysis_mode="News Summary",
             query=f"Build a CSE research snapshot for {company_name or final_symbol}.",
         )
+
+    if final_symbol:
+        try:
+            hist_cc = YahooCSEClient(universe_path=UNIVERSE_PATH).get_history(final_symbol, period="6m")
+            if not hist_cc.empty:
+                tech_cc = generate_technical_signals(hist_cc)
+                divider_label(f"Quantitative Technical Analysis — {final_symbol}")
+                t1, t2, t3 = st.columns(3)
+                t1.metric("RSI (14D)", f"{tech_cc['rsi']:.1f}", tech_cc["rsi_signal"])
+                t2.metric("MACD Crossover", tech_cc["macd_signal"])
+                t3.metric("Moving Avg Signal", "Golden Cross (Bullish)" if tech_cc["golden_cross"] else ("Death Cross (Bearish)" if tech_cc["death_cross"] else "Neutral"))
+        except Exception:
+            pass
 
     divider_label("High-Priority Disclosures")
 
