@@ -177,7 +177,7 @@ class YahooCSEClient:
         return Quote(
             requested_symbol=self.normalize_symbol_text(user_symbol),
             canonical_symbol=canonical_symbol,
-            yahoo_symbol=yahoo_symbol,
+            yahoo_symbol=selected_yahoo_symbol,
             company_name=company_name,
             currency=currency,
             last_traded_price=last_price,
