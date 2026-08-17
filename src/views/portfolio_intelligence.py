@@ -26,6 +26,7 @@ from src.app_state import send_to_analyst_workspace, send_to_stock_research, get
 from src.screener_utils import build_screening_dataset, apply_nl_screener_hint
 from src.yahoo_prices import YahooCSEClient
 from src.cse_announcements import CSEAnnouncementsClient
+from src.portfolio_risk import evaluate_portfolio_risk_metrics
 
 
 
@@ -160,6 +161,7 @@ if snapshot_df.empty:
 
 metrics = portfolio_summary_metrics(snapshot_df)
 flags = concentration_flags(snapshot_df)
+risk_stats = evaluate_portfolio_risk_metrics(snapshot_df)
 
 metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
 metric_col1.metric("Holdings", metrics["holdings"])
@@ -167,6 +169,16 @@ metric_col2.metric("Market Value", _fmt_num(metrics["total_market_value"]))
 metric_col3.metric("Cost Basis", _fmt_num(metrics["total_cost_basis"]))
 metric_col4.metric("Unrealized PnL", _fmt_num(metrics["total_unrealized_pnl"]))
 metric_col5.metric("Unrealized PnL %", _fmt_num(metrics["total_unrealized_pnl_pct"]))
+
+st.markdown("<br>", unsafe_allow_html=True)
+section_header("Institutional Portfolio Risk Analytics")
+
+risk_col1, risk_col2, risk_col3, risk_col4, risk_col5 = st.columns(5)
+risk_col1.metric("Sharpe Ratio", f"{risk_stats['sharpe_ratio']:.2f}", risk_stats["health_label"])
+risk_col2.metric("Sortino Ratio", f"{risk_stats['sortino_ratio']:.2f}")
+risk_col3.metric("Max Drawdown", f"-{risk_stats['max_drawdown_pct']:.1f}%")
+risk_col4.metric("Ann. Volatility", f"{risk_stats['annualized_volatility_pct']:.1f}%")
+risk_col5.metric("Portfolio Beta", f"{risk_stats['portfolio_beta']:.2f}")
 
 flag_col1, flag_col2 = st.columns([2, 1])
 
@@ -312,13 +324,21 @@ with port_tab2:
     scr_col1, scr_col2 = st.columns([2, 1])
     screener_preset = scr_col1.selectbox(
         "Screening Preset",
-        ["All Universe", "High 1M Momentum (>10%)", "High 20D Volume", "Recent Disclosures"],
+        [
+            "All Universe",
+            "Golden Cross (SMA 50/200 Bullish)",
+            "RSI Oversold (<35 Rebound)",
+            "RSI Overbought (>70)",
+            "High 1M Momentum (>10%)",
+            "High 20D Volume",
+            "Recent Disclosures",
+        ],
         key="port_scr_preset",
     )
     max_screener_rows = scr_col2.number_input("Max Rows", min_value=10, max_value=250, value=50, step=10, key="port_scr_limit")
 
     try:
-        with st.spinner("Building screening dataset..."):
+        with st.spinner("Building quantitative screening dataset..."):
             universe_df_scr = YahooCSEClient(universe_path=UNIVERSE_PATH).load_universe()
             announcements_df_scr = CSEAnnouncementsClient().fetch_announcements("All")
             screen_df = build_screening_dataset(
@@ -331,7 +351,13 @@ with port_tab2:
         screen_df = pd.DataFrame()
 
     if isinstance(screen_df, pd.DataFrame) and not screen_df.empty:
-        if screener_preset == "High 1M Momentum (>10%)" and "return_1m_pct" in screen_df.columns:
+        if screener_preset == "Golden Cross (SMA 50/200 Bullish)" and "golden_cross" in screen_df.columns:
+            screen_df = screen_df[screen_df["golden_cross"] == True]
+        elif screener_preset == "RSI Oversold (<35 Rebound)" and "rsi_14" in screen_df.columns:
+            screen_df = screen_df[screen_df["rsi_14"] < 35.0]
+        elif screener_preset == "RSI Overbought (>70)" and "rsi_14" in screen_df.columns:
+            screen_df = screen_df[screen_df["rsi_14"] > 70.0]
+        elif screener_preset == "High 1M Momentum (>10%)" and "return_1m_pct" in screen_df.columns:
             screen_df = screen_df[screen_df["return_1m_pct"] > 10.0]
         elif screener_preset == "High 20D Volume" and "avg_volume_20d" in screen_df.columns:
             screen_df = screen_df.sort_values(by="avg_volume_20d", ascending=False)

@@ -7,6 +7,7 @@ import streamlit as st
 
 from src.yahoo_prices import YahooCSEClient
 from src.cse_announcements import CSEAnnouncementsClient
+from src.ta_engine import compute_rsi, compute_macd, compute_bollinger_bands, generate_technical_signals
 from src.announcement_intelligence import (
     fetch_announcement_text,
     summarize_announcement_text,
@@ -363,16 +364,35 @@ with tabs[0]:
             st.info("No report summary generated yet. Use the Reports tab.")
 
 with tabs[1]:
-    st.subheader("Market")
+    st.subheader("Market & Technical Indicators")
 
     if hist.empty:
         st.warning("No historical market data returned.")
     else:
+        tech_sig = generate_technical_signals(hist)
+
+        ta1, ta2, ta3, ta4 = st.columns(4)
+        ta1.metric("RSI (14D)", f"{tech_sig['rsi']:.1f}", tech_sig["rsi_signal"])
+        ta2.metric("MACD Signal", tech_sig["macd_signal"])
+        ta3.metric("Golden Cross", "Active" if tech_sig["golden_cross"] else ("Death Cross" if tech_sig["death_cross"] else "Neutral"))
+        ta4.metric("ATR Volatility", f"LKR {tech_sig['volatility_atr']:.2f}")
+
         st.plotly_chart(
             _build_price_chart(hist, f"{company_name} Price History"),
             use_container_width=True,
             key=f"market_price_chart_{final_symbol}",
         )
+
+        # Build RSI chart
+        if "Close" in hist.columns and len(hist) > 14:
+            rsi_series = compute_rsi(hist["Close"])
+            rsi_fig = go.Figure()
+            rsi_fig.add_trace(go.Scatter(x=hist["Date"] if "Date" in hist.columns else hist.index, y=rsi_series, mode="lines", name="RSI (14)"))
+            rsi_fig.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought (70)")
+            rsi_fig.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold (30)")
+            rsi_fig.update_layout(title="Relative Strength Index (RSI 14)", height=280, margin=dict(l=20, r=20, t=40, b=20))
+            st.plotly_chart(rsi_fig, use_container_width=True, key=f"market_rsi_chart_{final_symbol}")
+
         st.plotly_chart(
             _build_volume_chart(hist),
             use_container_width=True,

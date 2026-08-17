@@ -5,6 +5,7 @@ import pandas as pd
 
 from src.yahoo_prices import YahooCSEClient
 from src.cse_announcements import CSEAnnouncementsClient
+from src.ta_engine import generate_technical_signals
 
 
 def _num(value):
@@ -182,6 +183,8 @@ def build_screening_dataset(
             ret_6m = _return_from_days(hist, 180)
             volatility = _annualized_volatility(hist)
 
+            tech_signals = generate_technical_signals(hist)
+
             rows.append(
                 {
                     "symbol": symbol,
@@ -194,6 +197,9 @@ def build_screening_dataset(
                     "return_3m_pct": ret_3m,
                     "return_6m_pct": ret_6m,
                     "volatility_pct": volatility,
+                    "rsi_14": tech_signals.get("rsi", 50.0),
+                    "macd_signal": tech_signals.get("macd_signal", "Neutral"),
+                    "golden_cross": tech_signals.get("golden_cross", False),
                 }
             )
         except Exception:
@@ -209,6 +215,9 @@ def build_screening_dataset(
                     "return_3m_pct": None,
                     "return_6m_pct": None,
                     "volatility_pct": None,
+                    "rsi_14": 50.0,
+                    "macd_signal": "Neutral",
+                    "golden_cross": False,
                 }
             )
 
