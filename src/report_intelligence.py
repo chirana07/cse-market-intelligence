@@ -300,3 +300,38 @@ Answer:
 
     result = llm.invoke(prompt)
     return result.content if hasattr(result, "content") else str(result)
+
+
+def compute_commercial_financial_ratios(
+    revenue: float | None = None,
+    operating_profit: float | None = None,
+    pat: float | None = None,
+    total_assets: float | None = None,
+    total_equity: float | None = None,
+    total_debt: float | None = None,
+) -> dict[str, float | None]:
+    """Compute enterprise commercial financial ratios."""
+    ratios: dict[str, float | None] = {
+        "net_margin_pct": None,
+        "op_margin_pct": None,
+        "roe_pct": None,
+        "roa_pct": None,
+        "debt_to_equity": None,
+    }
+
+    if revenue and revenue > 0:
+        if pat is not None:
+            ratios["net_margin_pct"] = round((pat / revenue) * 100.0, 2)
+        if operating_profit is not None:
+            ratios["op_margin_pct"] = round((operating_profit / revenue) * 100.0, 2)
+
+    if total_equity and total_equity > 0:
+        if pat is not None:
+            ratios["roe_pct"] = round((pat / total_equity) * 100.0, 2)
+        if total_debt is not None:
+            ratios["debt_to_equity"] = round(total_debt / total_equity, 2)
+
+    if total_assets and total_assets > 0 and pat is not None:
+        ratios["roa_pct"] = round((pat / total_assets) * 100.0, 2)
+
+    return ratios

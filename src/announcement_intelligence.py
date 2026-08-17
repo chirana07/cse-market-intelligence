@@ -167,3 +167,29 @@ Answer:
 
     result = llm.invoke(prompt)
     return result.content if hasattr(result, "content") else str(result)
+
+
+def analyze_catalyst_impact(title: str, text: str = "") -> dict[str, str]:
+    """Classify disclosure catalyst impact into Bullish, Bearish, or Neutral."""
+    combined = f"{title} {text}".upper()
+
+    bullish_keywords = ["DIVIDEND", "RIGHTS ISSUE", "ACQUISITION", "PROFIT EXPANSION", "BONUS ISSUE", "EXPANSION", "GROWTH", "RECORD PROFIT"]
+    bearish_keywords = ["PROFIT WARNING", "LOSS", "DELIST", "RESIGNATION", "LITIGATION", "PENALTY", "DEFAULT", "IMPAIRMENT"]
+
+    is_bullish = any(k in combined for k in bullish_keywords)
+    is_bearish = any(k in combined for k in bearish_keywords)
+
+    if is_bullish and not is_bearish:
+        sentiment = "Bullish"
+        impact = "Positive catalyst likely to enhance investor confidence or dividend yield."
+    elif is_bearish and not is_bullish:
+        sentiment = "Bearish"
+        impact = "Negative catalyst or risk flag requiring analyst scrutiny."
+    else:
+        sentiment = "Neutral"
+        impact = "Routine corporate disclosure or balanced material event."
+
+    return {
+        "sentiment": sentiment,
+        "impact_note": impact,
+    }
