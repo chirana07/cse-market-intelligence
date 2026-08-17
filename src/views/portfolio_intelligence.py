@@ -326,19 +326,16 @@ with port_tab2:
         "Screening Preset",
         [
             "All Universe",
-            "Golden Cross (SMA 50/200 Bullish)",
-            "RSI Oversold (<35 Rebound)",
-            "RSI Overbought (>70)",
-            "High 1M Momentum (>10%)",
-            "High 20D Volume",
-            "Recent Disclosures",
+            "Recent Disclosures Active",
+            "High Priority Disclosures",
+            "High Market Volume",
         ],
         key="port_scr_preset",
     )
     max_screener_rows = scr_col2.number_input("Max Rows", min_value=10, max_value=250, value=50, step=10, key="port_scr_limit")
 
     try:
-        with st.spinner("Building quantitative screening dataset..."):
+        with st.spinner("Building corporate screening dataset..."):
             universe_df_scr = YahooCSEClient(universe_path=UNIVERSE_PATH).load_universe()
             announcements_df_scr = CSEAnnouncementsClient().fetch_announcements("All")
             screen_df = build_screening_dataset(
@@ -351,18 +348,12 @@ with port_tab2:
         screen_df = pd.DataFrame()
 
     if isinstance(screen_df, pd.DataFrame) and not screen_df.empty:
-        if screener_preset == "Golden Cross (SMA 50/200 Bullish)" and "golden_cross" in screen_df.columns:
-            screen_df = screen_df[screen_df["golden_cross"] == True]
-        elif screener_preset == "RSI Oversold (<35 Rebound)" and "rsi_14" in screen_df.columns:
-            screen_df = screen_df[screen_df["rsi_14"] < 35.0]
-        elif screener_preset == "RSI Overbought (>70)" and "rsi_14" in screen_df.columns:
-            screen_df = screen_df[screen_df["rsi_14"] > 70.0]
-        elif screener_preset == "High 1M Momentum (>10%)" and "return_1m_pct" in screen_df.columns:
-            screen_df = screen_df[screen_df["return_1m_pct"] > 10.0]
-        elif screener_preset == "High 20D Volume" and "avg_volume_20d" in screen_df.columns:
-            screen_df = screen_df.sort_values(by="avg_volume_20d", ascending=False)
-        elif screener_preset == "Recent Disclosures" and "announcement_count" in screen_df.columns:
+        if screener_preset == "Recent Disclosures Active" and "announcement_count" in screen_df.columns:
             screen_df = screen_df[screen_df["announcement_count"] > 0]
+        elif screener_preset == "High Priority Disclosures" and "high_priority_count" in screen_df.columns:
+            screen_df = screen_df[screen_df["high_priority_count"] > 0]
+        elif screener_preset == "High Market Volume" and "avg_volume_20d" in screen_df.columns:
+            screen_df = screen_df.sort_values(by="avg_volume_20d", ascending=False)
 
         st.dataframe(screen_df, use_container_width=True, hide_index=True)
     else:

@@ -186,14 +186,6 @@ with main_left:
     final_symbol, company_name = render_company_selector(universe_df, key_prefix="cc_launcher")
 
     if final_symbol:
-        hist_cc = get_history_cached(final_symbol, period="6m")
-        if not hist_cc.empty:
-            tech_cc = generate_technical_signals(hist_cc)
-            t1, t2, t3 = st.columns(3)
-            t1.metric("RSI (14D)", f"{tech_cc['rsi']:.1f}", tech_cc["rsi_signal"])
-            t2.metric("MACD Crossover", tech_cc["macd_signal"])
-            t3.metric("Moving Avg", "Golden Cross" if tech_cc["golden_cross"] else ("Death Cross" if tech_cc["death_cross"] else "Neutral"))
-
         qcol1, qcol2, qcol3 = st.columns(3)
         if qcol1.button("Stock Research Hub", use_container_width=True, key="cc_stock_btn", type="primary"):
             send_to_stock_research(final_symbol, company_name or final_symbol)

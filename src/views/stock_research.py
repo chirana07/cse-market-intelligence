@@ -290,10 +290,9 @@ if not company_announcements.empty:
         ).reset_index(drop=True)
 
 st.markdown(f"## {company_name}")
-header_col1, header_col2, header_col3 = st.columns([1, 1, 1])
-header_col1.caption(f"Ticker: {final_symbol}")
-header_col2.caption(f"Yahoo symbol: {quote.yahoo_symbol}")
-header_col3.button(
+header_col1, header_col2 = st.columns([2, 1])
+header_col1.caption(f"Listed Ticker: **{final_symbol}** · Primary Exchange: **Colombo Stock Exchange (CSE)**")
+header_col2.button(
     "Send to Analyst Workspace",
     on_click=send_to_analyst_workspace,
     args=(
@@ -303,104 +302,37 @@ header_col3.button(
         f"Build a research memo for {company_name or final_symbol}, including market view, latest disclosures, and key risks.",
     ),
     use_container_width=True,
+    type="primary",
 )
 
-metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-metric_col1.metric("Last Traded Price", _fmt_num(quote.last_traded_price), _fmt_delta(quote.change, quote.change_pct))
-metric_col2.metric("Open", _fmt_num(quote.open_price))
-metric_col3.metric("High / Low", f"{_fmt_num(quote.high)} / {_fmt_num(quote.low)}")
-metric_col4.metric("Volume", _fmt_num(quote.volume, decimals=0))
+st.markdown("<br>", unsafe_allow_html=True)
 
-metric_col5, metric_col6, metric_col7, metric_col8 = st.columns(4)
-metric_col5.metric("Previous Close", _fmt_num(quote.previous_close))
-metric_col6.metric("Market Cap", _fmt_num(quote.market_cap))
-if not hist.empty:
-    year_slice = hist.tail(min(len(hist), 252))
-    metric_col7.metric("52W High", _fmt_num(year_slice["High"].max()))
-    metric_col8.metric("52W Low", _fmt_num(year_slice["Low"].min()))
-else:
-    metric_col7.metric("52W High", "N/A")
-    metric_col8.metric("52W Low", "N/A")
-
-tabs = st.tabs(["Overview", "Market", "Announcements", "Reports", "AI View"])
+tabs = st.tabs(["Overview & Intelligence", "Announcements Feed", "Reports & Key Figures", "AI Copilot View"])
 
 with tabs[0]:
-    st.subheader("Overview")
-
-    if not hist.empty:
-        ret_col1, ret_col2, ret_col3, ret_col4, ret_col5 = st.columns(5)
-        ret_col1.metric("1W Return", _fmt_delta(None, _return_from_days(hist, 7)))
-        ret_col2.metric("1M Return", _fmt_delta(None, _return_from_days(hist, 30)))
-        ret_col3.metric("3M Return", _fmt_delta(None, _return_from_days(hist, 90)))
-        ret_col4.metric("6M Return", _fmt_delta(None, _return_from_days(hist, 180)))
-        ret_col5.metric("YTD Return", _fmt_delta(None, _ytd_return(hist)))
-
-        st.plotly_chart(
-            _build_price_chart(hist, f"{company_name} Price History"),
-            use_container_width=True,
-            key=f"overview_price_chart_{final_symbol}",
-        )
+    st.subheader("Company Overview & Disclosures")
 
     ov_col1, ov_col2 = st.columns(2)
 
     with ov_col1:
-        st.markdown("### Latest Disclosure")
+        st.markdown("### Latest Material Disclosure")
         if company_announcements.empty:
-            st.info("No company-specific announcements found.")
+            st.info("No company-specific announcements found in the latest CSE feed.")
         else:
             latest_ann = company_announcements.iloc[0]
-            st.caption(f"{latest_ann.get('announcement_date', '')} • {latest_ann.get('category', '')}")
-            st.write(latest_ann.get("announcement_title", ""))
+            st.caption(f"{latest_ann.get('announcement_date', '')} • Category: {latest_ann.get('category', '')}")
+            st.markdown(f"**{latest_ann.get('announcement_title', '')}**")
             if latest_ann.get("pdf_url"):
-                st.link_button("Open PDF", latest_ann.get("pdf_url"), use_container_width=True)
+                st.link_button("Open Official Announcement PDF", latest_ann.get("pdf_url"), use_container_width=True)
             elif latest_ann.get("detail_url"):
-                st.link_button("Open Announcement", latest_ann.get("detail_url"), use_container_width=True)
+                st.link_button("Open Announcement Details", latest_ann.get("detail_url"), use_container_width=True)
 
     with ov_col2:
-        st.markdown("### Latest Report Intelligence")
+        st.markdown("### Latest Financial Intelligence")
         if st.session_state.stock_research_report_summary:
             st.write(st.session_state.stock_research_report_summary[:1800])
         else:
-            st.info("No report summary generated yet. Use the Reports tab.")
-
-with tabs[1]:
-    st.subheader("Market & Technical Indicators")
-
-    if hist.empty:
-        st.warning("No historical market data returned.")
-    else:
-        tech_sig = generate_technical_signals(hist)
-
-        ta1, ta2, ta3, ta4 = st.columns(4)
-        ta1.metric("RSI (14D)", f"{tech_sig['rsi']:.1f}", tech_sig["rsi_signal"])
-        ta2.metric("MACD Signal", tech_sig["macd_signal"])
-        ta3.metric("Golden Cross", "Active" if tech_sig["golden_cross"] else ("Death Cross" if tech_sig["death_cross"] else "Neutral"))
-        ta4.metric("ATR Volatility", f"LKR {tech_sig['volatility_atr']:.2f}")
-
-        st.plotly_chart(
-            _build_price_chart(hist, f"{company_name} Price History"),
-            use_container_width=True,
-            key=f"market_price_chart_{final_symbol}",
-        )
-
-        # Build RSI chart
-        if "Close" in hist.columns and len(hist) > 14:
-            rsi_series = compute_rsi(hist["Close"])
-            rsi_fig = go.Figure()
-            rsi_fig.add_trace(go.Scatter(x=hist["Date"] if "Date" in hist.columns else hist.index, y=rsi_series, mode="lines", name="RSI (14)"))
-            rsi_fig.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Overbought (70)")
-            rsi_fig.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Oversold (30)")
-            rsi_fig.update_layout(title="Relative Strength Index (RSI 14)", height=280, margin=dict(l=20, r=20, t=40, b=20))
-            st.plotly_chart(rsi_fig, use_container_width=True, key=f"market_rsi_chart_{final_symbol}")
-
-        st.plotly_chart(
-            _build_volume_chart(hist),
-            use_container_width=True,
-            key=f"market_volume_chart_{final_symbol}",
-        )
-
-        with st.expander("Show historical market data"):
-            st.dataframe(hist, use_container_width=True, hide_index=True)
+            st.info("No report summary generated yet. Upload an annual or interim PDF report in the Reports tab to extract key figures.")
 
 with tabs[2]:
     st.subheader("Announcements")
