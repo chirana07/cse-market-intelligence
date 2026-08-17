@@ -10,9 +10,12 @@ from src.report_intelligence import (
     extract_pdf_text_from_bytes,
     extract_pdf_text_from_url,
     summarize_report,
+    generate_executive_tear_sheet,
+    compute_commercial_financial_ratios,
 )
 from src.event_extraction import extract_events_from_report, event_importance_score
 from src.financial_extraction import extract_financial_facts_from_report
+from src.announcement_intelligence import analyze_catalyst_impact
 from src.persistence import (
     build_report_cache_key,
     load_report_artifacts,
@@ -145,11 +148,12 @@ with main_tab1:
         key="latest_upload_pdf",
     )
 
-    btn_col1, btn_col2 = st.columns(2)
-    analyze_clicked = btn_col1.button("Analyze Report", use_container_width=True)
-    interim_clicked = btn_col2.button("Extract Key Interim Figures", use_container_width=True)
+    btn_col1, btn_col2, btn_col3 = st.columns(3)
+    analyze_clicked = btn_col1.button("Analyze Full Report", use_container_width=True)
+    interim_clicked = btn_col2.button("Extract Interim Figures", use_container_width=True)
+    tearsheet_clicked = btn_col3.button("⚡ Executive Tear Sheet", use_container_width=True, kind="primary")
 
-    if analyze_clicked or interim_clicked:
+    if analyze_clicked or interim_clicked or tearsheet_clicked:
         if not latest_report_url.strip() and latest_upload is None:
             st.warning("Provide a report PDF URL or upload a PDF.")
         else:
@@ -179,6 +183,15 @@ with main_tab1:
                     event = cached.get("event", {}) if cached else {}
                     financials = cached.get("financials", {}) if cached else {}
                     interim_kf = cached.get("interim_key_figures", "") if cached else ""
+
+                    if tearsheet_clicked:
+                        with st.spinner("Generating 1-Click Executive Earnings Tear Sheet..."):
+                            tear_sheet_data = generate_executive_tear_sheet(
+                                company_name=company_name or "CSE Listed Company",
+                                ticker=final_symbol,
+                                report_text=latest_text,
+                            )
+                            st.session_state.executive_tear_sheet = tear_sheet_data
 
                     if interim_clicked and not interim_kf:
                         with st.spinner("Extracting Key Interim Figures with AI analyst engine..."):
@@ -238,6 +251,21 @@ with main_tab1:
                     st.session_state.selected_report_financials = financials
             except Exception as e:
                 st.error(f"Failed to analyze report: {e}")
+
+    ts_data = st.session_state.get("executive_tear_sheet")
+    if ts_data:
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown(f"## ⚡ 1-Click Executive Earnings Tear Sheet — {ts_data['company_name']} ({ts_data['ticker']})")
+            st.markdown(f"**Performance Verdict**: `{ts_data['verdict']}`")
+            st.markdown(ts_data["markdown_tear_sheet"])
+            st.download_button(
+                label="📥 Download Executive Tear Sheet (.md)",
+                data=ts_data["markdown_tear_sheet"],
+                file_name=f"TearSheet_{ts_data['ticker']}.md",
+                mime="text/markdown",
+            )
+        st.markdown("---")
 
     if st.session_state.report_summary_output or st.session_state.interim_key_figures_output:
         st.markdown(f"### {company_name or final_symbol or 'Selected Company'}")
@@ -417,15 +445,16 @@ with main_tab2:
             st.write((st.session_state.previous_report_text or "")[:5000] or "No text extracted.")
 
 with main_tab3:
-    st.subheader("Official CSE Disclosures Feed")
+    st.subheader("Official CSE Disclosures Feed & AI Catalyst Radar")
 
-    cat_col1, cat_col2 = st.columns([2, 1])
+    cat_col1, cat_col2, cat_col3 = st.columns([2, 1.5, 1])
     selected_cat = cat_col1.selectbox("Category", list(CATEGORY_URLS.keys()), key="doc_intel_cat")
-    search_kw = cat_col2.text_input("Filter Keyword", placeholder="e.g. Dividend, Interim, Rights", key="doc_intel_kw")
+    catalyst_filter = cat_col2.selectbox("AI Catalyst Radar", ["All Catalysts", "🟢 Bullish Catalysts", "🔴 Bearish Risk Flags", "⚪ Routine"], key="doc_intel_cat_filter")
+    search_kw = cat_col3.text_input("Filter Ticker", placeholder="e.g. JKH, COMB", key="doc_intel_kw")
 
     try:
         with st.spinner("Fetching disclosures feed..."):
-            feed_df = CSEAnnouncementsClient(timeout=10).fetch_announcements(selected_cat)
+            feed_df = CSEAnnouncementsClient(timeout=6).fetch_announcements(selected_cat)
     except Exception:
         feed_df = pd.DataFrame()
 
@@ -438,7 +467,36 @@ with main_tab3:
                 | filtered_df["company_name"].astype(str).str.upper().str.contains(kw_q, na=False)
             ]
         
-        display_cols = [c for c in ["announcement_date", "company_name", "category", "announcement_title"] if c in filtered_df.columns]
-        st.dataframe(filtered_df[display_cols].head(50), use_container_width=True, hide_index=True)
+        for card_idx, (_, row) in enumerate(filtered_df.head(15).iterrows()):
+            ttl = str(row.get("announcement_title", "")).strip()
+            co = str(row.get("company_name", "")).strip()
+            dt = str(row.get("announcement_date", "")).strip()
+            cat = str(row.get("category", "")).strip()
+            detail_url = str(row.get("detail_url", "")).strip()
+            pdf_url = str(row.get("pdf_url", "")).strip()
+
+            impact_data = analyze_catalyst_impact(ttl)
+            sentiment = impact_data["sentiment"]
+            note = impact_data["impact_note"]
+
+            if catalyst_filter == "🟢 Bullish Catalysts" and sentiment != "Bullish":
+                continue
+            elif catalyst_filter == "🔴 Bearish Risk Flags" and sentiment != "Bearish":
+                continue
+            elif catalyst_filter == "⚪ Routine" and sentiment != "Neutral":
+                continue
+
+            badge_level = "positive" if sentiment == "Bullish" else ("high" if sentiment == "Bearish" else "neutral")
+            badge_icon = "🟢 BULLISH CATALYST" if sentiment == "Bullish" else ("🔴 BEARISH RISK FLAG" if sentiment == "Bearish" else "⚪ ROUTINE")
+
+            with st.container(border=True):
+                r_top1, r_top2 = st.columns([3, 1])
+                r_top1.markdown(f"**{co or 'CSE Company'}** &nbsp;<span class='cc-subtle'>({dt})</span>", unsafe_allow_html=True)
+                r_top2.markdown(status_badge(badge_icon, badge_level), unsafe_allow_html=True)
+                st.caption(f"Category: {cat}")
+                st.write(f"**{ttl}**")
+                st.info(f"💡 **AI Catalyst Impact Note**: {note}")
+                if detail_url or pdf_url:
+                    st.link_button("Open Official Disclosure PDF", detail_url or pdf_url)
     else:
         empty_state("No Disclosures", "No announcements currently parsed for this category.", "Try selecting 'All' or retry network request.")
